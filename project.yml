@@ -1,0 +1,65 @@
+name: Mimer
+options:
+  bundleIdPrefix: com.hasanjafri
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+
+settings:
+  base:
+    # Swift 6 toolchain, Swift 5 language mode for the scaffold.
+    # Migrate to Swift 6 language mode in Phase 1 with the concurrency-sensitive monitor.
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    DEVELOPMENT_TEAM: ""              # set when configuring Developer ID signing
+    CODE_SIGN_STYLE: Automatic
+    ENABLE_HARDENED_RUNTIME: YES      # required for notarized direct distribution
+
+packages:
+  KeyboardShortcuts:
+    url: https://github.com/sindresorhus/KeyboardShortcuts
+    from: "2.0.0"
+
+targets:
+  Mimer:
+    type: application
+    platform: macOS
+    sources:
+      - path: Sources/Mimer
+    dependencies:
+      - package: KeyboardShortcuts
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.hasanjafri.Mimer
+        PRODUCT_NAME: Mimer
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_LSUIElement: YES          # menu-bar agent, no Dock icon
+        INFOPLIST_KEY_NSHumanReadableCopyright: "Mimer — MIT-licensed."
+        COMBINE_HIDPI_IMAGES: YES
+
+  MimerTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: Tests/MimerTests
+    dependencies:
+      - target: Mimer
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.hasanjafri.MimerTests
+        GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+  Mimer:
+    build:
+      targets:
+        Mimer: all
+        MimerTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - MimerTests
