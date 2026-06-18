@@ -22,6 +22,10 @@ struct MimerApp: App {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Agent app (LSUIElement): no Dock icon, menu-bar presence only.
+        ClipboardMonitor.shared.start()
         PaletteController.shared.setup()
+        #if DEBUG
+        DebugBridge.shared.start()
+        #endif
     }
 }

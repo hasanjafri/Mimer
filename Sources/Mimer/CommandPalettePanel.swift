@@ -19,7 +19,7 @@ final class CommandPalettePanel: NSPanel {
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         hidesOnDeactivate = false
         isReleasedWhenClosed = false
-        animationBehavior = .utilityWindow
+        animationBehavior = .none          // instant show/hide — snappy, predictable
         backgroundColor = .clear
         isOpaque = false
         hasShadow = true
@@ -30,14 +30,15 @@ final class CommandPalettePanel: NSPanel {
     override func cancelOperation(_ sender: Any?) { orderOut(nil) }
 }
 
-/// Owns the palette panel: summon/dismiss, remembers the previously-frontmost app,
-/// and drives paste-back. Lives for the app's lifetime (created by AppDelegate).
+/// Owns the palette panel: summon/dismiss, remembers the previously-frontmost
+/// app, drives paste-back, and closes on click-away. Lives for the app's lifetime.
 @MainActor
-final class PaletteController {
+final class PaletteController: NSObject {
     static let shared = PaletteController()
 
     private var panel: CommandPalettePanel?
     private var previousApp: NSRunningApplication?
+    private var isDismissing = false
 
     func setup() {
         KeyboardShortcuts.onKeyDown(for: .togglePalette) { [weak self] in
@@ -46,57 +47,74 @@ final class PaletteController {
     }
 
     func toggle() {
-        if let panel, panel.isVisible {
-            dismiss(paste: nil)
-        } else {
-            present()
-        }
+        if isPaletteVisible { dismiss(paste: nil) } else { open() }
     }
 
-    private func present() {
-        // Remember who was frontmost so we can paste back into it.
+    func open() {
+        guard !isPaletteVisible else { return }
         previousApp = NSWorkspace.shared.frontmostApplication
-
-        let panel = panel ?? makePanel()
+        let panel = makePanel()   // fresh each open → field re-focuses + clean search
         self.panel = panel
-
         if let screen = NSScreen.main {
             let size = panel.frame.size
-            let origin = NSPoint(
+            panel.setFrameOrigin(NSPoint(
                 x: screen.frame.midX - size.width / 2,
                 y: screen.frame.midY - size.height / 2 + 100
-            )
-            panel.setFrameOrigin(origin)
+            ))
         }
-        // Key (so typing works) but NOT activating (prior app stays frontmost).
         panel.makeKeyAndOrderFront(nil)
     }
 
+    func close() { dismiss(paste: nil) }
+
     /// Dismiss the panel. If `text` is non-nil, copy it and paste into the prior app.
     func dismiss(paste text: String?) {
+        guard !isDismissing else { return }
+        isDismissing = true
+        defer { isDismissing = false }
+
         panel?.orderOut(nil)
+        panel = nil
         guard let text else { return }
 
         Paster.copyToPasteboard(text)
-
-        // Make sure the app we came from is frontmost, then synthesize ⌘V.
         previousApp?.activate()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
-            if !Paster.synthesizePaste() {
-                // No PostEvent permission yet — content is on the clipboard;
-                // request the grant for next time. (User can ⌘V meanwhile.)
-                Paster.requestPostEventAccess()
-            }
+            if !Paster.synthesizePaste() { Paster.requestPostEventAccess() }
         }
     }
 
+    /// Paste the clip at `index` of the current history (used by the debug bridge).
+    func pasteClip(at index: Int) {
+        let clips = ClipboardMonitor.shared.clips
+        guard clips.indices.contains(index) else { return }
+        dismiss(paste: clips[index])
+    }
+
+    // Introspection (used by the debug bridge).
+    var isPaletteVisible: Bool { panel?.isVisible ?? false }
+    var isPaletteKey: Bool { panel?.isKeyWindow ?? false }
+    var firstResponderDescription: String {
+        guard let fr = panel?.firstResponder else { return "nil" }
+        return String(describing: type(of: fr))
+    }
+
     private func makePanel() -> CommandPalettePanel {
-        let panel = CommandPalettePanel(contentRect: NSRect(x: 0, y: 0, width: 640, height: 420))
+        let panel = CommandPalettePanel(contentRect: NSRect(x: 0, y: 0, width: 640, height: 440))
+        panel.delegate = self
         let root = PaletteView(
             onPaste: { [weak self] text in self?.dismiss(paste: text) },
             onClose: { [weak self] in self?.dismiss(paste: nil) }
         )
         panel.contentView = NSHostingView(rootView: root)
         return panel
+    }
+}
+
+extension PaletteController: NSWindowDelegate {
+    /// Click-away or app-switch closes the palette (the fix for "it won't close").
+    func windowDidResignKey(_ notification: Notification) {
+        guard !isDismissing, isPaletteVisible else { return }
+        dismiss(paste: nil)
     }
 }
