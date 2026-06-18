@@ -9,10 +9,6 @@ struct MimerApp: App {
             MenuBarView()
         }
         .menuBarExtraStyle(.window)
-
-        Settings {
-            SettingsView()
-        }
     }
 }
 

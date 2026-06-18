@@ -47,6 +47,7 @@ final class DebugBridge {
             if parts.count > 1, let index = Int(parts[1]) {
                 PaletteController.shared.pasteClip(at: index)
             }
+        case "settings": SettingsWindowController.shared.show()
         default: break
         }
     }
@@ -57,6 +58,7 @@ final class DebugBridge {
             "paletteKey": PaletteController.shared.isPaletteKey,
             "firstResponder": PaletteController.shared.firstResponderDescription,
             "canPostEvents": Paster.canPostEvents,
+            "settingsVisible": SettingsWindowController.shared.isVisible,
             "clipCount": ClipboardMonitor.shared.clips.count,
             "clips": Array(ClipboardMonitor.shared.clips.prefix(10))
         ]

@@ -86,7 +86,7 @@ struct MenuBarView: View {
                 Label("Open Mimer  ⇧⌘V", systemImage: "magnifyingglass")
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
-            SettingsLink {
+            Button { SettingsWindowController.shared.show() } label: {
                 Label("Settings…", systemImage: "gearshape")
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
