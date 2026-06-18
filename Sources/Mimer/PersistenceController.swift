@@ -25,6 +25,9 @@ final class PersistenceController {
             try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
             description?.url = dir.appendingPathComponent("Mimer.sqlite")
         }
+        // Additive attributes (kind, contentHash) migrate via inferred lightweight migration.
+        description?.shouldMigrateStoreAutomatically = true
+        description?.shouldInferMappingModelAutomatically = true
         container.loadPersistentStores { _, error in
             if let error { NSLog("Mimer Core Data load error: \(error.localizedDescription)") }
         }
@@ -51,6 +54,8 @@ final class PersistenceController {
         clip.properties = [
             attribute("id", .UUIDAttributeType),
             attribute("text", .stringAttributeType),
+            attribute("contentHash", .stringAttributeType),
+            attribute("kind", .integer16AttributeType, defaultValue: 0),
             attribute("createdAt", .dateAttributeType),
             attribute("lastUsedAt", .dateAttributeType),
             attribute("isFavorite", .booleanAttributeType, defaultValue: false)

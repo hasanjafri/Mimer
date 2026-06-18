@@ -45,4 +45,16 @@ final class ClipboardMonitorTests: XCTestCase {
         XCTAssertFalse(m.captureIfChanged())     // changeCount unchanged → no-op
         XCTAssertEqual(captured(), ["x"])
     }
+
+    func testIgnoresRestoredType() {
+        let (m, pb, captured) = makeMonitor()
+        pb.clearContents()
+        pb.declareTypes(
+            [.string, NSPasteboard.PasteboardType("org.nspasteboard.RestoredType")],
+            owner: nil
+        )
+        pb.setString("our own paste-back", forType: .string)
+        XCTAssertFalse(m.captureIfChanged())     // self-paste marker → skipped
+        XCTAssertTrue(captured().isEmpty)
+    }
 }
