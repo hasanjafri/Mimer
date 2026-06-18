@@ -4,13 +4,35 @@
 
 ---
 
+## 0. Status — working v0 (June 2026)
+
+Built, unit-tested (9 green), and verified end-to-end via a `#if DEBUG` test bridge:
+- **Scaffold** (XcodeGen, SwiftUI menu-bar agent) + **command palette** (nonactivating `NSPanel`, ⇧⌘V, type-to-search, key focus without activating the app) + **auto-paste** (`CGEvent.post` via `kTCCServicePostEvent`, manual ⌘V fallback).
+- **Capture engine** (changeCount poll, ignores password/transient/concealed types) → **Core Data persistence** (history survives restart).
+- **Favorites** (star → pinned to top, never pruned, persists) — the "saved forever" headline.
+- **Menu-bar history** (recall on click) + **Settings** (history size, rows-shown; dedicated AppKit window).
+
+Locked direction: **free + open-source (MIT), direct-download first (non-sandboxed Developer ID), MAS later**; local-first, CloudKit-valid model for later sync.
+
+## 0a. Forward review decisions (June 2026) — see [`FORWARD_REVIEW.md`](FORWARD_REVIEW.md)
+
+The working v0 was reviewed via `/autoplan` (CEO/DevEx/Design/Eng + Codex cross-model). Unanimous finding: as shipped it's undifferentiated vs free Maccy + the macOS 26 built-in — the differentiators are specced but unbuilt. Approved decisions:
+
+1. **Positioning: developer-first.** The wedge is OS-proof dev features (code/JSON-aware clips + transforms, paste-stack, snippets), not "private + free + favorites" (table stakes).
+2. **Sync deferred; stop pre-paying the CloudKit tax.** Shape the model for the dev features, not CloudKit constraints.
+3. **Free + OSS now, reserve an optional one-time Pro lever** (no subscription) for later — not $0-locked.
+4. **Build order: foundation refactors → parity basics → the wedge.** Ranked work + design/eng fixes are in `FORWARD_REVIEW.md` (it supersedes the §6 roadmap order below).
+
+---
+
 ## 1. Locked decisions (updated after review)
 
 | Decision | Choice | Consequence |
 |---|---|---|
-| **Monetization** | **Completely free, forever** + **open-source (MIT)** | No IAP/licensing. Sustainability = open-source: contributors share the macOS-breakage maintenance load. |
+| **Monetization** | **Free + open-source (MIT) now; reserve an optional one-time Pro lever** (no subscription) for later power features | Not $0-locked. Keeps a maintenance-funding option open (decided later); core stays free. |
+| **Positioning** | **Developer-first** (post-v0 review) | Optimize next features for devs; wedge = code-aware clips/transforms, paste-stack, snippets. |
 | **Distribution** | **Direct-download first** — Developer ID notarized `.dmg` + Sparkle auto-update + **Homebrew Cask**; public **GitHub from day 1**; **Mac App Store later** | The real growth engine for a free Mac utility (Show HN, r/macapps, awesome-macos, Homebrew). v1 ships **non-sandboxed**, which unlocks clean auto-paste + import. Keep APIs MAS/sandbox-compatible so a later App Store build is feasible. |
-| **Sync & scope** | **Local-only Mac v1**, CloudKit-valid model from day 1 | Sync = the first post-1.0 headline. |
+| **Sync & scope** | **Sync deferred; model NOT contorted for CloudKit.** Shape the data model for the dev features (`kind`, `contentHash`, blobs). | Sync = real scoped work later if validated; the "cheap flag-flip" assumption was false in code anyway. |
 | **v1 feature scope** | **Full feature set** (your call) | Kept full. **Release valve:** Tags, multi-pinboard organization, and CopyClip import may slip to 1.1 if 1.0 timelines stretch. |
 
 ---
