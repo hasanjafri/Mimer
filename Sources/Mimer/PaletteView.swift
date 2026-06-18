@@ -1,18 +1,18 @@
 import SwiftUI
 
-/// Command palette UI: search + result list over the live clipboard history.
+/// Command palette: search + result list over the persistent clipboard history.
 struct PaletteView: View {
     let onPaste: (String) -> Void
     let onClose: () -> Void
 
-    @ObservedObject private var monitor = ClipboardMonitor.shared
+    @ObservedObject private var store = ClipStore.shared
     @State private var query = ""
     @State private var selection = 0
     @FocusState private var searchFocused: Bool
 
-    private var clips: [String] {
-        let all = monitor.clips
-        return query.isEmpty ? all : all.filter { $0.localizedCaseInsensitiveContains(query) }
+    private var results: [ClipItem] {
+        let all = store.items
+        return query.isEmpty ? all : all.filter { $0.text.localizedCaseInsensitiveContains(query) }
     }
 
     var body: some View {
@@ -26,7 +26,7 @@ struct PaletteView: View {
 
             Divider()
 
-            if clips.isEmpty {
+            if results.isEmpty {
                 emptyState
             } else {
                 resultList
@@ -38,11 +38,10 @@ struct PaletteView: View {
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
         .onAppear {
             selection = 0
-            // Defer to the next runloop so the panel is key before grabbing focus.
             DispatchQueue.main.async { searchFocused = true }
         }
         .onChange(of: query) { selection = 0 }
-        .onChange(of: clips.count) { if selection >= clips.count { selection = max(0, clips.count - 1) } }
+        .onChange(of: results.count) { if selection >= results.count { selection = max(0, results.count - 1) } }
         .onKeyPress(.downArrow) { move(1); return .handled }
         .onKeyPress(.upArrow) { move(-1); return .handled }
         .onKeyPress(.return) { pasteSelected(); return .handled }
@@ -51,10 +50,10 @@ struct PaletteView: View {
 
     private var resultList: some View {
         ScrollView {
-            VStack(spacing: 2) {
-                ForEach(Array(clips.enumerated()), id: \.offset) { index, clip in
+            LazyVStack(spacing: 2) {
+                ForEach(Array(results.enumerated()), id: \.element.id) { index, item in
                     HStack {
-                        Text(clip).lineLimit(1).truncationMode(.middle)
+                        Text(item.text).lineLimit(1).truncationMode(.middle)
                         Spacer(minLength: 0)
                     }
                     .padding(.horizontal, 12)
@@ -74,10 +73,9 @@ struct PaletteView: View {
     private var emptyState: some View {
         VStack(spacing: 8) {
             Spacer()
-            Image(systemName: "doc.on.clipboard")
-                .font(.largeTitle).foregroundStyle(.secondary)
-            Text("No clips yet").font(.headline)
-            Text("Copy some text, then it appears here.")
+            Image(systemName: "doc.on.clipboard").font(.largeTitle).foregroundStyle(.secondary)
+            Text(store.items.isEmpty ? "No clips yet" : "No matches").font(.headline)
+            Text(store.items.isEmpty ? "Copy some text and it appears here." : "Try a different search.")
                 .font(.callout).foregroundStyle(.secondary)
             Spacer()
         }
@@ -88,7 +86,7 @@ struct PaletteView: View {
         HStack {
             Text("↑↓ move · ⏎ paste · esc close")
             Spacer()
-            Text("text only · more in Phase 1")
+            Text("text only · more soon")
         }
         .font(.caption2)
         .foregroundStyle(.tertiary)
@@ -97,12 +95,12 @@ struct PaletteView: View {
     }
 
     private func move(_ delta: Int) {
-        guard !clips.isEmpty else { return }
-        selection = (selection + delta + clips.count) % clips.count
+        guard !results.isEmpty else { return }
+        selection = (selection + delta + results.count) % results.count
     }
 
     private func pasteSelected() {
-        guard clips.indices.contains(selection) else { return }
-        onPaste(clips[selection])
+        guard results.indices.contains(selection) else { return }
+        onPaste(results[selection].text)
     }
 }

@@ -86,9 +86,9 @@ final class PaletteController: NSObject {
 
     /// Paste the clip at `index` of the current history (used by the debug bridge).
     func pasteClip(at index: Int) {
-        let clips = ClipboardMonitor.shared.clips
-        guard clips.indices.contains(index) else { return }
-        dismiss(paste: clips[index])
+        let items = ClipStore.shared.items
+        guard items.indices.contains(index) else { return }
+        dismiss(paste: items[index].text)
     }
 
     // Introspection (used by the debug bridge).

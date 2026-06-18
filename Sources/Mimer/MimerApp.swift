@@ -16,9 +16,17 @@ struct MimerApp: App {
 /// hotkeys — wired up starting in Phase 1. Kept on the delegate (not a SwiftUI
 /// view) so they outlive any view's lifecycle.
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    private var monitor: ClipboardMonitor?
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Agent app (LSUIElement): no Dock icon, menu-bar presence only.
-        ClipboardMonitor.shared.start()
+        ClipStore.shared.loadInitial()
+        let monitor = ClipboardMonitor(onCapture: { text in
+            ClipStore.shared.insert(text: text)
+        })
+        monitor.start()
+        self.monitor = monitor
+
         PaletteController.shared.setup()
         #if DEBUG
         DebugBridge.shared.start()

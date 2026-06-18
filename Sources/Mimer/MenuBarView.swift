@@ -1,21 +1,18 @@
 import SwiftUI
 
-/// Menu-bar dropdown: shows recent clipboard history (newest first). Its height
-/// grows with the number of clips up to the "show N at once" preference (capped
-/// at the screen height), then scrolls. Clicking a clip recalls it onto the
-/// clipboard. The full searchable, auto-pasting surface is the ⇧⌘V palette.
+/// Menu-bar dropdown: recent clipboard history (newest first), height driven by
+/// the "show N at once" preference (capped at screen height), then scrolls.
+/// Clicking a clip recalls it onto the clipboard.
 struct MenuBarView: View {
-    @ObservedObject private var monitor = ClipboardMonitor.shared
+    @ObservedObject private var store = ClipStore.shared
     @ObservedObject private var prefs = Preferences.shared
 
     private let rowHeight: CGFloat = 30
 
-    /// Height of the scrollable list: content height, capped at the user's
-    /// "show N at once" rows, itself capped at the available screen height.
     private var listHeight: CGFloat {
         let screenCap = (NSScreen.main?.visibleFrame.height ?? 800) - 160
         let visibleCap = min(CGFloat(prefs.visibleRows) * rowHeight, screenCap)
-        let contentHeight = CGFloat(monitor.clips.count) * rowHeight
+        let contentHeight = CGFloat(store.items.count) * rowHeight
         return max(rowHeight, min(contentHeight, visibleCap))
     }
 
@@ -24,7 +21,7 @@ struct MenuBarView: View {
             header
             Divider()
 
-            if monitor.clips.isEmpty {
+            if store.items.isEmpty {
                 Text("No clips yet — copy some text and it shows up here.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
@@ -33,8 +30,8 @@ struct MenuBarView: View {
             } else {
                 ScrollView {
                     LazyVStack(spacing: 1) {
-                        ForEach(Array(monitor.clips.enumerated()), id: \.offset) { index, clip in
-                            row(index: index, clip: clip)
+                        ForEach(Array(store.items.enumerated()), id: \.element.id) { index, item in
+                            row(index: index, text: item.text)
                         }
                     }
                     .padding(.vertical, 4)
@@ -53,24 +50,24 @@ struct MenuBarView: View {
             Image(systemName: "doc.on.clipboard")
             Text("Mimer").font(.headline)
             Spacer()
-            if !monitor.clips.isEmpty {
-                Text("\(monitor.clips.count)").font(.caption).foregroundStyle(.secondary)
+            if !store.items.isEmpty {
+                Text("\(store.items.count)").font(.caption).foregroundStyle(.secondary)
             }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
     }
 
-    private func row(index: Int, clip: String) -> some View {
+    private func row(index: Int, text: String) -> some View {
         Button {
-            Paster.copyToPasteboard(clip)   // recall onto the clipboard
+            Paster.copyToPasteboard(text)
         } label: {
             HStack(spacing: 8) {
                 Text("\(index + 1)")
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.tertiary)
                     .frame(width: 18, alignment: .trailing)
-                Text(clip).lineLimit(1).truncationMode(.middle)
+                Text(text).lineLimit(1).truncationMode(.middle)
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, 12)

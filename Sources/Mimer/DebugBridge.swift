@@ -59,8 +59,8 @@ final class DebugBridge {
             "firstResponder": PaletteController.shared.firstResponderDescription,
             "canPostEvents": Paster.canPostEvents,
             "settingsVisible": SettingsWindowController.shared.isVisible,
-            "clipCount": ClipboardMonitor.shared.clips.count,
-            "clips": Array(ClipboardMonitor.shared.clips.prefix(10))
+            "clipCount": ClipStore.shared.items.count,
+            "clips": Array(ClipStore.shared.items.prefix(10).map(\.text))
         ]
         if let data = try? JSONSerialization.data(
             withJSONObject: state, options: [.prettyPrinted, .sortedKeys]
