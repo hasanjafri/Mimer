@@ -15,6 +15,12 @@ struct MenuBarView: View {
 
             Divider()
 
+            Button {
+                PaletteController.shared.toggle()
+            } label: {
+                Label("Open Mimer  ⇧⌘V", systemImage: "magnifyingglass")
+            }
+
             SettingsLink {
                 Label("Settings…", systemImage: "gearshape")
             }
