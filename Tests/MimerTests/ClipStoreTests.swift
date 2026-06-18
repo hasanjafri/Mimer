@@ -33,12 +33,27 @@ final class ClipStoreTests: XCTestCase {
         for s in ["a", "b", "c", "d", "e"] { store.insert(text: s) }
         XCTAssertEqual(store.items.map(\.text), ["e", "d", "c"])
 
-        // Favorite the oldest survivor, then overflow again — the favorite stays.
+        // Favorite a survivor, then overflow again — the favorite stays.
         if let c = store.items.first(where: { $0.text == "c" }) {
             store.setFavorite(c.id, true)
         }
         for s in ["f", "g", "h"] { store.insert(text: s) }
         XCTAssertTrue(store.items.contains { $0.text == "c" }, "favorite must not be pruned")
+    }
+
+    func testFavoritePinsToTopAndToggles() {
+        let store = makeStore()
+        store.insert(text: "a")
+        store.insert(text: "b")
+        store.insert(text: "c")   // newest-first: c, b, a
+
+        let a = store.items.first { $0.text == "a" }!
+        store.toggleFavorite(a.id)
+        XCTAssertEqual(store.items.first?.text, "a")          // favorite pinned to top
+        XCTAssertEqual(store.items.first?.isFavorite, true)
+
+        store.toggleFavorite(a.id)                            // unfavorite → back to chronological
+        XCTAssertEqual(store.items.map(\.text), ["c", "b", "a"])
     }
 
     func testPersistsAcrossReopen() {

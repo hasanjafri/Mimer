@@ -48,6 +48,11 @@ final class DebugBridge {
                 PaletteController.shared.pasteClip(at: index)
             }
         case "settings": SettingsWindowController.shared.show()
+        case "fav":
+            if parts.count > 1, let index = Int(parts[1]) {
+                let items = ClipStore.shared.items
+                if items.indices.contains(index) { ClipStore.shared.toggleFavorite(items[index].id) }
+            }
         default: break
         }
     }
@@ -60,7 +65,8 @@ final class DebugBridge {
             "canPostEvents": Paster.canPostEvents,
             "settingsVisible": SettingsWindowController.shared.isVisible,
             "clipCount": ClipStore.shared.items.count,
-            "clips": Array(ClipStore.shared.items.prefix(10).map(\.text))
+            "clips": Array(ClipStore.shared.items.prefix(10).map(\.text)),
+            "favorites": ClipStore.shared.items.filter(\.isFavorite).map(\.text)
         ]
         if let data = try? JSONSerialization.data(
             withJSONObject: state, options: [.prettyPrinted, .sortedKeys]

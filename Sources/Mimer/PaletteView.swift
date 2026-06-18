@@ -1,6 +1,7 @@
 import SwiftUI
 
 /// Command palette: search + result list over the persistent clipboard history.
+/// ⌘D favorites the selected clip (favorites pin to the top and are kept forever).
 struct PaletteView: View {
     let onPaste: (String) -> Void
     let onClose: () -> Void
@@ -46,15 +47,25 @@ struct PaletteView: View {
         .onKeyPress(.upArrow) { move(-1); return .handled }
         .onKeyPress(.return) { pasteSelected(); return .handled }
         .onKeyPress(.escape) { onClose(); return .handled }
+        .onKeyPress(phases: .down) { press in
+            if press.characters == "d" && press.modifiers.contains(.command) {
+                toggleFavoriteSelected()
+                return .handled
+            }
+            return .ignored
+        }
     }
 
     private var resultList: some View {
         ScrollView {
             LazyVStack(spacing: 2) {
                 ForEach(Array(results.enumerated()), id: \.element.id) { index, item in
-                    HStack {
+                    HStack(spacing: 8) {
                         Text(item.text).lineLimit(1).truncationMode(.middle)
                         Spacer(minLength: 0)
+                        if item.isFavorite {
+                            Image(systemName: "star.fill").font(.caption).foregroundStyle(.yellow)
+                        }
                     }
                     .padding(.horizontal, 12)
                     .padding(.vertical, 9)
@@ -84,7 +95,7 @@ struct PaletteView: View {
 
     private var footer: some View {
         HStack {
-            Text("↑↓ move · ⏎ paste · esc close")
+            Text("↑↓ move · ⏎ paste · ⌘D favorite · esc close")
             Spacer()
             Text("text only · more soon")
         }
@@ -102,5 +113,10 @@ struct PaletteView: View {
     private func pasteSelected() {
         guard results.indices.contains(selection) else { return }
         onPaste(results[selection].text)
+    }
+
+    private func toggleFavoriteSelected() {
+        guard results.indices.contains(selection) else { return }
+        store.toggleFavorite(results[selection].id)
     }
 }

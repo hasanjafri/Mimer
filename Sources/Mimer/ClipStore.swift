@@ -2,8 +2,9 @@ import CoreData
 import Combine
 
 /// The clipboard history, backed by Core Data. Publishes value-type `ClipItem`
-/// snapshots for the UI. Dedupes by text (re-copy moves to top) and prunes the
-/// rolling history to the user's `historyLimit`, never pruning favorites.
+/// snapshots for the UI. Dedupes by text (re-copy moves to top), prunes the
+/// rolling history to the user's `historyLimit` (favorites never pruned), and
+/// pins favorites to the top.
 @MainActor
 final class ClipStore: ObservableObject {
     static let shared = ClipStore()
@@ -43,24 +44,29 @@ final class ClipStore: ObservableObject {
         saveAndRefresh()
     }
 
+    func toggleFavorite(_ id: UUID) {
+        guard let clip = clip(with: id) else { return }
+        clip.isFavorite.toggle()
+        saveAndRefresh()
+    }
+
     func setFavorite(_ id: UUID, _ isFavorite: Bool) {
-        let request = Clip.fetch()
-        request.predicate = NSPredicate(format: "id == %@", id as CVarArg)
-        request.fetchLimit = 1
-        if let clip = (try? context.fetch(request))?.first {
-            clip.isFavorite = isFavorite
-            saveAndRefresh()
-        }
+        guard let clip = clip(with: id) else { return }
+        clip.isFavorite = isFavorite
+        saveAndRefresh()
     }
 
     func delete(_ id: UUID) {
+        guard let clip = clip(with: id) else { return }
+        context.delete(clip)
+        saveAndRefresh()
+    }
+
+    private func clip(with id: UUID) -> Clip? {
         let request = Clip.fetch()
         request.predicate = NSPredicate(format: "id == %@", id as CVarArg)
         request.fetchLimit = 1
-        if let clip = (try? context.fetch(request))?.first {
-            context.delete(clip)
-            saveAndRefresh()
-        }
+        return (try? context.fetch(request))?.first
     }
 
     private func prune() {
@@ -79,7 +85,11 @@ final class ClipStore: ObservableObject {
 
     func refresh() {
         let request = Clip.fetch()
-        request.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: false)]
+        // Favorites pinned to the top; then most-recent first.
+        request.sortDescriptors = [
+            NSSortDescriptor(key: "isFavorite", ascending: false),
+            NSSortDescriptor(key: "createdAt", ascending: false)
+        ]
         let clips = (try? context.fetch(request)) ?? []
         items = clips.compactMap { clip in
             guard let id = clip.id, let text = clip.text, let createdAt = clip.createdAt else { return nil }
