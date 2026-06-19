@@ -10,6 +10,7 @@ struct PaletteView: View {
     @State private var query = ""
     @State private var selection = 0
     @FocusState private var searchFocused: Bool
+    @State private var needsPasteGrant = !Paster.canPostEvents
 
     private var results: [ClipItem] {
         let all = store.items
@@ -18,6 +19,10 @@ struct PaletteView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            if needsPasteGrant {
+                pasteGrantBanner
+                Divider()
+            }
             TextField("Search your clipboard…", text: $query)
                 .textFieldStyle(.plain)
                 .font(.title2)
@@ -99,6 +104,22 @@ struct PaletteView: View {
             Spacer()
         }
         .frame(maxWidth: .infinity)
+    }
+
+    private var pasteGrantBanner: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "bolt.fill").foregroundStyle(.orange)
+            Text("Enable auto-paste so ⏎ pastes into the app you were in").font(.caption)
+            Spacer(minLength: 0)
+            Button("Enable") {
+                Paster.requestPostEventAccess()
+                needsPasteGrant = !Paster.canPostEvents
+            }
+            .controlSize(.small)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color.orange.opacity(0.12))
     }
 
     private var footer: some View {

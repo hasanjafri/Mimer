@@ -28,6 +28,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.monitor = monitor
 
         PaletteController.shared.setup()
+        OnboardingWindowController.shared.showIfNeeded()
         #if DEBUG
         DebugBridge.shared.start()
         #endif

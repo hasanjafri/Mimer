@@ -79,8 +79,12 @@ final class PaletteController: NSObject {
 
         Paster.copyToPasteboard(text)
         previousApp?.activate()
+        // Only auto-paste if already permitted; otherwise the clip is on the
+        // clipboard (the user presses ⌘V). Never prompt for the grant mid-paste —
+        // the palette banner and onboarding handle enabling it, in context.
+        guard Paster.canPostEvents else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
-            if !Paster.synthesizePaste() { Paster.requestPostEventAccess() }
+            Paster.synthesizePaste()
         }
     }
 
