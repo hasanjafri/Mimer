@@ -13,6 +13,9 @@ final class ClipStore: ObservableObject {
 
     @Published private(set) var items: [ClipItem] = []
 
+    /// Increments on every captured clip — drives the menu-bar "captured" pulse.
+    @Published private(set) var captureTick: Int = 0
+
     /// Test hook to override the history cap without touching global Preferences.
     var historyLimitOverride: Int?
 
@@ -50,6 +53,7 @@ final class ClipStore: ObservableObject {
         save()        // persist before pruning (batch delete operates on the store)
         prune()
         refresh()
+        captureTick &+= 1   // pulse the menu-bar icon
     }
 
     func toggleFavorite(_ id: UUID) {

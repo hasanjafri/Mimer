@@ -57,4 +57,14 @@ final class ClipboardMonitorTests: XCTestCase {
         XCTAssertFalse(m.captureIfChanged())     // self-paste marker → skipped
         XCTAssertTrue(captured().isEmpty)
     }
+
+    func testRespectsShouldCaptureGate() {
+        let pb = NSPasteboard(name: NSPasteboard.Name("MimerTest-\(UUID().uuidString)"))
+        pb.clearContents()
+        var captured: [String] = []
+        let monitor = ClipboardMonitor(pasteboard: pb, shouldCapture: { false }, onCapture: { captured.append($0) })
+        pb.clearContents(); pb.setString("blocked while paused/excluded", forType: .string)
+        XCTAssertFalse(monitor.captureIfChanged())
+        XCTAssertTrue(captured.isEmpty)
+    }
 }

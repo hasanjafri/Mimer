@@ -6,6 +6,7 @@ import AppKit
 /// the filter logic is unit-testable without the user's real clipboard.
 final class ClipboardMonitor {
     private let pasteboard: NSPasteboard
+    private let shouldCapture: () -> Bool
     private let onCapture: (String) -> Void
     private var timer: Timer?
     private var lastChangeCount: Int
@@ -18,8 +19,11 @@ final class ClipboardMonitor {
         "org.nspasteboard.RestoredType"      // our own paste-backs (avoid a capture loop)
     ]
 
-    init(pasteboard: NSPasteboard = .general, onCapture: @escaping (String) -> Void) {
+    init(pasteboard: NSPasteboard = .general,
+         shouldCapture: @escaping () -> Bool = { true },
+         onCapture: @escaping (String) -> Void) {
         self.pasteboard = pasteboard
+        self.shouldCapture = shouldCapture
         self.onCapture = onCapture
         self.lastChangeCount = pasteboard.changeCount
     }
@@ -48,6 +52,7 @@ final class ClipboardMonitor {
 
         lastChangeCount = changeCount
 
+        guard shouldCapture() else { return false }   // pause / excluded app / password manager
         guard types.isDisjoint(with: ignoredTypes) else { return false }
         guard let text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
 

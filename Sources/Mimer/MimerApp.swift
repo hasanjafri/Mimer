@@ -5,8 +5,10 @@ struct MimerApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     var body: some Scene {
-        MenuBarExtra("Mimer", systemImage: "doc.on.clipboard") {
+        MenuBarExtra {
             MenuBarView()
+        } label: {
+            MenuBarLabel()
         }
         .menuBarExtraStyle(.window)
     }
@@ -21,9 +23,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Agent app (LSUIElement): no Dock icon, menu-bar presence only.
         ClipStore.shared.loadInitial()
-        let monitor = ClipboardMonitor(onCapture: { text in
-            ClipStore.shared.insert(text: text)
-        })
+        let monitor = ClipboardMonitor(
+            shouldCapture: { CaptureGate.captureAllowed() },
+            onCapture: { text in ClipStore.shared.insert(text: text) }
+        )
         monitor.start()
         self.monitor = monitor
 

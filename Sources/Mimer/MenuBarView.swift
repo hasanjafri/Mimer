@@ -21,6 +21,15 @@ struct MenuBarView: View {
             header
             Divider()
 
+            if prefs.isPaused {
+                Label("Paused — not recording", systemImage: "pause.circle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+            }
+
             if store.items.isEmpty {
                 Text("No clips yet — copy some text and it shows up here.")
                     .font(.callout)
@@ -87,6 +96,11 @@ struct MenuBarView: View {
                 Label("Open Mimer  ⇧⌘V", systemImage: "magnifyingglass")
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
+            Button { prefs.isPaused.toggle() } label: {
+                Label(prefs.isPaused ? "Resume recording" : "Pause recording",
+                      systemImage: prefs.isPaused ? "play.fill" : "pause.fill")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
             Button { SettingsWindowController.shared.show() } label: {
                 Label("Settings…", systemImage: "gearshape")
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -99,5 +113,23 @@ struct MenuBarView: View {
         .buttonStyle(.plain)
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
+    }
+}
+
+/// The menu-bar icon: bounces and briefly flashes a check when a clip is captured
+/// (so it's clear Mimer caught the copy), and dims while recording is paused.
+struct MenuBarLabel: View {
+    @ObservedObject private var store = ClipStore.shared
+    @ObservedObject private var prefs = Preferences.shared
+    @State private var justCaptured = false
+
+    var body: some View {
+        Image(systemName: justCaptured ? "checkmark.circle.fill" : "doc.on.clipboard")
+            .symbolEffect(.bounce, value: store.captureTick)
+            .opacity(prefs.isPaused ? 0.4 : 1)
+            .onChange(of: store.captureTick) {
+                justCaptured = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) { justCaptured = false }
+            }
     }
 }

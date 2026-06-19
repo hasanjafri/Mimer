@@ -58,6 +58,8 @@ final class DebugBridge {
                 let items = ClipStore.shared.items
                 if items.indices.contains(index) { ClipStore.shared.delete(items[index].id) }
             }
+        case "pause": Preferences.shared.isPaused = true
+        case "resume": Preferences.shared.isPaused = false
         default: break
         }
     }
@@ -69,6 +71,7 @@ final class DebugBridge {
             "firstResponder": PaletteController.shared.firstResponderDescription,
             "canPostEvents": Paster.canPostEvents,
             "settingsVisible": SettingsWindowController.shared.isVisible,
+            "isPaused": Preferences.shared.isPaused,
             "clipCount": ClipStore.shared.items.count,
             "clips": Array(ClipStore.shared.items.prefix(10).map(\.text)),
             "favorites": ClipStore.shared.items.filter(\.isFavorite).map(\.text)
