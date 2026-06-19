@@ -53,6 +53,11 @@ final class DebugBridge {
                 let items = ClipStore.shared.items
                 if items.indices.contains(index) { ClipStore.shared.toggleFavorite(items[index].id) }
             }
+        case "delete":
+            if parts.count > 1, let index = Int(parts[1]) {
+                let items = ClipStore.shared.items
+                if items.indices.contains(index) { ClipStore.shared.delete(items[index].id) }
+            }
         default: break
         }
     }

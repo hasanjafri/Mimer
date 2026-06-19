@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Command palette: search + result list over the persistent clipboard history.
-/// ⌘D favorites the selected clip (favorites pin to the top and are kept forever).
+/// Keyboard: ↑↓ move · ⏎ paste · ⌘1–9 quick-paste · ⌘D favorite · ⌫ delete · esc.
 struct PaletteView: View {
     let onPaste: (String) -> Void
     let onClose: () -> Void
@@ -13,7 +13,7 @@ struct PaletteView: View {
 
     private var results: [ClipItem] {
         let all = store.items
-        return query.isEmpty ? all : all.filter { $0.text.localizedCaseInsensitiveContains(query) }
+        return query.isEmpty ? all : all.filter { fuzzyMatch(query, $0.text) }
     }
 
     var body: some View {
@@ -46,10 +46,13 @@ struct PaletteView: View {
         .onKeyPress(.downArrow) { move(1); return .handled }
         .onKeyPress(.upArrow) { move(-1); return .handled }
         .onKeyPress(.return) { pasteSelected(); return .handled }
+        .onKeyPress(.delete) { deleteSelected(); return .handled }
         .onKeyPress(.escape) { onClose(); return .handled }
         .onKeyPress(phases: .down) { press in
-            if press.characters == "d" && press.modifiers.contains(.command) {
-                toggleFavoriteSelected()
+            guard press.modifiers.contains(.command) else { return .ignored }
+            if press.characters == "d" { toggleFavoriteSelected(); return .handled }
+            if let n = press.characters.first?.wholeNumberValue, (1...9).contains(n) {
+                pasteVisible(at: n - 1)
                 return .handled
             }
             return .ignored
@@ -65,6 +68,11 @@ struct PaletteView: View {
                         Spacer(minLength: 0)
                         if item.isFavorite {
                             Image(systemName: "star.fill").font(.caption).foregroundStyle(.yellow)
+                        }
+                        if index < 9 {
+                            Text("⌘\(index + 1)")
+                                .font(.caption2.monospacedDigit())
+                                .foregroundStyle(.tertiary)
                         }
                     }
                     .padding(.horizontal, 12)
@@ -94,15 +102,12 @@ struct PaletteView: View {
     }
 
     private var footer: some View {
-        HStack {
-            Text("↑↓ move · ⏎ paste · ⌘D favorite · esc close")
-            Spacer()
-            Text("text only · more soon")
-        }
-        .font(.caption2)
-        .foregroundStyle(.tertiary)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
+        Text("↑↓ move · ⏎ paste · ⌘1–9 quick · ⌘D favorite · ⌫ delete · esc close")
+            .font(.caption2)
+            .foregroundStyle(.tertiary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
     }
 
     private func move(_ delta: Int) {
@@ -115,8 +120,18 @@ struct PaletteView: View {
         onPaste(results[selection].text)
     }
 
+    private func pasteVisible(at index: Int) {
+        guard results.indices.contains(index) else { return }
+        onPaste(results[index].text)
+    }
+
     private func toggleFavoriteSelected() {
         guard results.indices.contains(selection) else { return }
         store.toggleFavorite(results[selection].id)
+    }
+
+    private func deleteSelected() {
+        guard results.indices.contains(selection) else { return }
+        store.delete(results[selection].id)
     }
 }
