@@ -37,7 +37,10 @@ private struct GeneralSettingsView: View {
 
             Section {
                 Toggle("Launch Mimer at login", isOn: $launchAtLogin)
-                    .onChange(of: launchAtLogin) { LaunchAtLogin.setEnabled(launchAtLogin) }
+                    .onChange(of: launchAtLogin) {
+                        LaunchAtLogin.setEnabled(launchAtLogin)
+                        launchAtLogin = LaunchAtLogin.isEnabled   // reflect the real status if the change failed
+                    }
             } header: {
                 Text("Startup")
             }

@@ -7,14 +7,22 @@ enum CaptureGate {
     /// Never record while one of these is the frontmost app.
     static let passwordManagerBundleIDs: Set<String> = [
         "com.1password.1password",
+        "com.1password.1password7",
         "com.agilebits.onepassword",
+        "com.agilebits.onepassword4",
         "com.agilebits.onepassword7",
         "com.bitwarden.desktop",
         "com.apple.Passwords",
         "org.keepassxc.keepassxc",
+        "com.mssns.KeePassium",
         "com.dashlane.Dashlane",
         "com.lastpass.LastPass",
-        "com.mssns.KeePassium"
+        "me.proton.pass.electron",
+        "in.sinew.Walletx.osx",        // Enpass
+        "com.enpass.Enpass",
+        "com.nordpass.macos",
+        "com.keepersecurity.mac",
+        "com.markmcguill.strongbox.mac"
     ]
 
     /// Evaluated at capture time (main thread, from the monitor's timer).

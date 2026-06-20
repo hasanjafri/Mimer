@@ -40,8 +40,8 @@ final class Preferences: ObservableObject {
     }
 
     private init() {
-        historyLimit = defaults.object(forKey: Keys.historyLimit) as? Int ?? 200
-        visibleRows = defaults.object(forKey: Keys.visibleRows) as? Int ?? 15
+        historyLimit = min(1000, max(25, defaults.object(forKey: Keys.historyLimit) as? Int ?? 200))
+        visibleRows = min(40, max(5, defaults.object(forKey: Keys.visibleRows) as? Int ?? 15))
         hasOnboarded = defaults.bool(forKey: Keys.hasOnboarded)
         isPaused = defaults.bool(forKey: Keys.isPaused)
         excludedBundleIDs = Set(defaults.stringArray(forKey: Keys.excludedBundleIDs) ?? [])

@@ -137,7 +137,13 @@ final class ClipStore: ObservableObject {
     }
 
     private func save() {
-        if context.hasChanges { try? context.save() }
+        guard context.hasChanges else { return }
+        do {
+            try context.save()
+        } catch {
+            NSLog("Mimer ClipStore save failed: \(error.localizedDescription)")
+            context.rollback()   // discard the failed change so the context stays consistent
+        }
     }
 
     /// Projection fetch: pull only the scalar fields the list needs, as a
