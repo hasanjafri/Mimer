@@ -73,6 +73,7 @@ struct MenuBarView: View {
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(.tertiary)
                 .frame(width: 18, alignment: .trailing)
+            KindIcon(kind: item.kind, text: item.text)
             Text(item.text).lineLimit(1).truncationMode(.middle)
             Spacer(minLength: 0)
             Button {

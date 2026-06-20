@@ -38,6 +38,7 @@ struct PaletteView: View {
                 resultList
             }
 
+            Divider()
             footer
         }
         .frame(width: 640, height: 440)
@@ -65,33 +66,55 @@ struct PaletteView: View {
     }
 
     private var resultList: some View {
-        ScrollView {
+        let showSections = results.contains(where: \.isFavorite) && results.contains(where: { !$0.isFavorite })
+        return ScrollView {
             LazyVStack(spacing: 2) {
                 ForEach(Array(results.enumerated()), id: \.element.id) { index, item in
-                    HStack(spacing: 8) {
-                        Text(item.text).lineLimit(1).truncationMode(.middle)
-                        Spacer(minLength: 0)
-                        if item.isFavorite {
-                            Image(systemName: "star.fill").font(.caption).foregroundStyle(.yellow)
-                        }
-                        if index < 9 {
-                            Text("⌘\(index + 1)")
-                                .font(.caption2.monospacedDigit())
-                                .foregroundStyle(.tertiary)
-                        }
+                    if showSections && index == 0 {
+                        sectionHeader("Favorites")
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 9)
-                    .background(
-                        index == selection ? Color.accentColor.opacity(0.25) : .clear,
-                        in: RoundedRectangle(cornerRadius: 6)
-                    )
-                    .contentShape(Rectangle())
-                    .onTapGesture { selection = index; pasteSelected() }
+                    if showSections && index > 0 && results[index - 1].isFavorite && !item.isFavorite {
+                        sectionHeader("Recents")
+                    }
+                    resultRow(index: index, item: item)
                 }
             }
             .padding(8)
         }
+    }
+
+    private func sectionHeader(_ title: String) -> some View {
+        Text(title.uppercased())
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 6)
+            .padding(.top, 6)
+            .padding(.bottom, 1)
+    }
+
+    private func resultRow(index: Int, item: ClipItem) -> some View {
+        HStack(spacing: 8) {
+            KindIcon(kind: item.kind, text: item.text)
+            Text(item.text).lineLimit(1).truncationMode(.middle)
+            Spacer(minLength: 0)
+            if item.isFavorite {
+                Image(systemName: "star.fill").font(.caption).foregroundStyle(.yellow)
+            }
+            if index < 9 {
+                Text("⌘\(index + 1)")
+                    .font(.caption2.monospacedDigit())
+                    .foregroundStyle(.tertiary)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(
+            index == selection ? Color.accentColor.opacity(0.25) : .clear,
+            in: RoundedRectangle(cornerRadius: 6)
+        )
+        .contentShape(Rectangle())
+        .onTapGesture { selection = index; pasteSelected() }
     }
 
     private var emptyState: some View {

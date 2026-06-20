@@ -44,7 +44,7 @@ final class ClipStore: ObservableObject {
             clip.id = UUID()
             clip.text = text
             clip.contentHash = hash
-            clip.kind = ClipKind.text.rawValue
+            clip.kind = ClipKind.detect(from: text).rawValue
             clip.createdAt = now
             clip.lastUsedAt = now
             clip.isFavorite = false
