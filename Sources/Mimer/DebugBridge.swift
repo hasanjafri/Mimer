@@ -71,6 +71,7 @@ final class DebugBridge {
             }
         case "snippet":
             if parts.count > 1 { ClipStore.shared.addSnippet(parts[1]) }
+        case "composer": SnippetComposerWindowController.shared.show()
         default: break
         }
     }

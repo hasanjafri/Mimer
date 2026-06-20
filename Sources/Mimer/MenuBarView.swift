@@ -102,6 +102,10 @@ struct MenuBarView: View {
                       systemImage: prefs.isPaused ? "play.fill" : "pause.fill")
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
+            Button { SnippetComposerWindowController.shared.show() } label: {
+                Label("New Snippet…", systemImage: "square.and.pencil")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
             Button { SettingsWindowController.shared.show() } label: {
                 Label("Settings…", systemImage: "gearshape")
                     .frame(maxWidth: .infinity, alignment: .leading)
