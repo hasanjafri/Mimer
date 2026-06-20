@@ -16,6 +16,9 @@ final class ClipStore: ObservableObject {
     /// Increments on every captured clip — drives the menu-bar "captured" pulse.
     @Published private(set) var captureTick: Int = 0
 
+    /// Authored, kept-forever snippets (kind == .snippet), separate from history.
+    @Published private(set) var snippets: [ClipItem] = []
+
     /// Test hook to override the history cap without touching global Preferences.
     var historyLimitOverride: Int?
 
@@ -33,7 +36,7 @@ final class ClipStore: ObservableObject {
         let hash = Self.contentHash(text)
 
         let request = Clip.fetch()
-        request.predicate = NSPredicate(format: "contentHash == %@", hash)
+        request.predicate = NSPredicate(format: "contentHash == %@ AND kind != %d", hash, ClipKind.snippet.rawValue)
         request.fetchLimit = 1
 
         if let existing = (try? context.fetch(request))?.first {
@@ -74,6 +77,30 @@ final class ClipStore: ObservableObject {
         save(); refresh()
     }
 
+    /// Save an authored snippet (kept forever, exempt from pruning). Identical
+    /// snippets are ignored; snippets never collide with captured history (the
+    /// history dedupe is scoped to non-snippet kinds).
+    func addSnippet(_ text: String) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        let hash = Self.contentHash(trimmed)
+
+        let existing = Clip.fetch()
+        existing.predicate = NSPredicate(format: "contentHash == %@ AND kind == %d", hash, ClipKind.snippet.rawValue)
+        existing.fetchLimit = 1
+        if (try? context.fetch(existing))?.first != nil { refresh(); return }
+
+        let clip = NSEntityDescription.insertNewObject(forEntityName: "Clip", into: context) as! Clip
+        clip.id = UUID()
+        clip.text = trimmed
+        clip.contentHash = hash
+        clip.kind = ClipKind.snippet.rawValue
+        clip.createdAt = Date()
+        clip.lastUsedAt = Date()
+        clip.isFavorite = false
+        save(); refresh()
+    }
+
     // MARK: - Internals
 
     private func clip(with id: UUID) -> Clip? {
@@ -92,7 +119,7 @@ final class ClipStore: ObservableObject {
         let idRequest = NSFetchRequest<NSManagedObjectID>(entityName: "Clip")
         idRequest.resultType = .managedObjectIDResultType
         idRequest.includesPendingChanges = false
-        idRequest.predicate = NSPredicate(format: "isFavorite == NO")
+        idRequest.predicate = NSPredicate(format: "isFavorite == NO AND kind != %d", ClipKind.snippet.rawValue)
         idRequest.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: false)]
 
         guard let ids = try? context.fetch(idRequest), ids.count > limit else { return }
@@ -116,16 +143,29 @@ final class ClipStore: ObservableObject {
     /// Projection fetch: pull only the scalar fields the list needs, as a
     /// dictionary, so blob columns (added later) are never faulted into the UI path.
     func refresh() {
+        let snippetKind = ClipKind.snippet.rawValue
+        items = fetchProjection(
+            predicate: NSPredicate(format: "kind != %d", snippetKind),
+            sort: [NSSortDescriptor(key: "isFavorite", ascending: false),   // favorites pinned on top
+                   NSSortDescriptor(key: "createdAt", ascending: false)]
+        )
+        snippets = fetchProjection(
+            predicate: NSPredicate(format: "kind == %d", snippetKind),
+            sort: [NSSortDescriptor(key: "createdAt", ascending: false)]
+        )
+    }
+
+    /// Projection fetch: pull only the scalar fields the list needs, as a
+    /// dictionary, so blob columns (added later) are never faulted into the UI path.
+    private func fetchProjection(predicate: NSPredicate, sort: [NSSortDescriptor]) -> [ClipItem] {
         let request = NSFetchRequest<NSDictionary>(entityName: "Clip")
         request.resultType = .dictionaryResultType
         request.includesPendingChanges = false
+        request.predicate = predicate
         request.propertiesToFetch = ["id", "text", "kind", "createdAt", "isFavorite"]
-        request.sortDescriptors = [
-            NSSortDescriptor(key: "isFavorite", ascending: false),   // favorites pinned on top
-            NSSortDescriptor(key: "createdAt", ascending: false)
-        ]
+        request.sortDescriptors = sort
         let rows = (try? context.fetch(request)) ?? []
-        items = rows.compactMap { row in
+        return rows.compactMap { row in
             guard let id = row["id"] as? UUID,
                   let text = row["text"] as? String,
                   let createdAt = row["createdAt"] as? Date else { return nil }
