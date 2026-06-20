@@ -14,6 +14,7 @@ struct SettingsView: View {
 
 private struct GeneralSettingsView: View {
     @ObservedObject private var prefs = Preferences.shared
+    @State private var launchAtLogin = LaunchAtLogin.isEnabled
 
     var body: some View {
         Form {
@@ -28,6 +29,13 @@ private struct GeneralSettingsView: View {
                 Text("History")
             } footer: {
                 Text("The menu grows to fit your clips up to this many rows (capped at screen height), then scrolls.")
+            }
+
+            Section {
+                Toggle("Launch Mimer at login", isOn: $launchAtLogin)
+                    .onChange(of: launchAtLogin) { LaunchAtLogin.setEnabled(launchAtLogin) }
+            } header: {
+                Text("Startup")
             }
         }
         .formStyle(.grouped)
