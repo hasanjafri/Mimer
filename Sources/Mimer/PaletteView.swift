@@ -1,10 +1,14 @@
 import SwiftUI
 
 /// Command palette: search + result list over the persistent clipboard history.
-/// Keyboard: ↑↓ move · ⏎ paste · ⌘1–9 quick-paste · ⌘D favorite · ⌫ delete · esc.
+/// Keyboard: ↑↓ move · ⏎ paste · ⌘1–9 quick · ⌘K transform · ⌘D favorite · ⌫ delete · esc.
+/// ⌘K opens transform mode for the selected clip (UPPER/lower, base64, JSON, …),
+/// with a live preview of each result. The search field stays mounted across modes
+/// so keyboard focus never drops.
 struct PaletteView: View {
     let onPaste: (String) -> Void
     let onClose: () -> Void
+    var initialTransformIndex: Int? = nil   // debug hook: open straight into transform mode
 
     @ObservedObject private var store = ClipStore.shared
     @State private var query = ""
@@ -12,9 +16,19 @@ struct PaletteView: View {
     @FocusState private var searchFocused: Bool
     @State private var needsPasteGrant = !Paster.canPostEvents
 
+    // Transform mode (⌘K): when set, the list shows transforms for this clip.
+    @State private var transformTarget: ClipItem?
+    @State private var transformSelection = 0
+
     private var results: [ClipItem] {
         let all = store.items
         return query.isEmpty ? all : all.filter { fuzzyMatch(query, $0.text) }
+    }
+
+    private var transforms: [ClipTransform] {
+        guard let target = transformTarget else { return [] }
+        let applicable = ClipTransform.applicable(to: target.text)
+        return query.isEmpty ? applicable : applicable.filter { fuzzyMatch(query, $0.name) }
     }
 
     var body: some View {
@@ -23,16 +37,23 @@ struct PaletteView: View {
                 pasteGrantBanner
                 Divider()
             }
-            TextField("Search your clipboard…", text: $query)
+
+            TextField(transformTarget == nil ? "Search your clipboard…" : "Filter transforms…", text: $query)
                 .textFieldStyle(.plain)
                 .font(.title2)
                 .padding(16)
                 .focused($searchFocused)
-                .onSubmit(pasteSelected)
+                .onSubmit(commitSelection)
+
+            if let target = transformTarget {
+                transformBar(target)
+            }
 
             Divider()
 
-            if results.isEmpty {
+            if transformTarget != nil {
+                transformList
+            } else if results.isEmpty {
                 emptyState
             } else {
                 resultList
@@ -45,34 +66,33 @@ struct PaletteView: View {
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
         .onAppear {
             selection = 0
+            query = ""
+            if let idx = initialTransformIndex, store.items.indices.contains(idx) {
+                transformTarget = store.items[idx]
+                transformSelection = 0
+            } else {
+                transformTarget = nil
+            }
             DispatchQueue.main.async { searchFocused = true }
         }
-        .onChange(of: query) { selection = 0 }
+        .onChange(of: query) { if transformTarget != nil { transformSelection = 0 } else { selection = 0 } }
         .onChange(of: results.count) { if selection >= results.count { selection = max(0, results.count - 1) } }
-        .onKeyPress(.downArrow) { move(1); return .handled }
-        .onKeyPress(.upArrow) { move(-1); return .handled }
-        .onKeyPress(.return) { pasteSelected(); return .handled }
-        .onKeyPress(.delete) { deleteSelected(); return .handled }
-        .onKeyPress(.escape) { onClose(); return .handled }
-        .onKeyPress(phases: .down) { press in
-            guard press.modifiers.contains(.command) else { return .ignored }
-            if press.characters == "d" { toggleFavoriteSelected(); return .handled }
-            if let n = press.characters.first?.wholeNumberValue, (1...9).contains(n) {
-                pasteVisible(at: n - 1)
-                return .handled
-            }
-            return .ignored
-        }
+        .onKeyPress(.downArrow) { moveSelection(1); return .handled }
+        .onKeyPress(.upArrow) { moveSelection(-1); return .handled }
+        .onKeyPress(.return) { commitSelection(); return .handled }
+        .onKeyPress(.escape) { escapeAction(); return .handled }
+        .onKeyPress(.delete) { guard transformTarget == nil else { return .ignored }; deleteSelected(); return .handled }
+        .onKeyPress(phases: .down) { handleCommandKey($0) }
     }
+
+    // MARK: - Search results
 
     private var resultList: some View {
         let showSections = results.contains(where: \.isFavorite) && results.contains(where: { !$0.isFavorite })
         return ScrollView {
             LazyVStack(spacing: 2) {
                 ForEach(Array(results.enumerated()), id: \.element.id) { index, item in
-                    if showSections && index == 0 {
-                        sectionHeader("Favorites")
-                    }
+                    if showSections && index == 0 { sectionHeader("Favorites") }
                     if showSections && index > 0 && results[index - 1].isFavorite && !item.isFavorite {
                         sectionHeader("Recents")
                     }
@@ -129,6 +149,61 @@ struct PaletteView: View {
         .frame(maxWidth: .infinity)
     }
 
+    // MARK: - Transform mode (⌘K)
+
+    private func transformBar(_ target: ClipItem) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: "wand.and.stars").foregroundStyle(.purple)
+            Text("Transform").foregroundStyle(.secondary)
+            Text(target.text).lineLimit(1).truncationMode(.middle)
+            Spacer(minLength: 8)
+            Text("esc to go back").foregroundStyle(.tertiary)
+        }
+        .font(.caption)
+        .padding(.horizontal, 16)
+        .padding(.bottom, 10)
+    }
+
+    private var transformList: some View {
+        ScrollView {
+            LazyVStack(spacing: 2) {
+                if transforms.isEmpty {
+                    Text("No transforms for this clip.")
+                        .font(.callout).foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(12)
+                }
+                ForEach(Array(transforms.enumerated()), id: \.element.id) { index, t in
+                    transformRow(index: index, t: t)
+                }
+            }
+            .padding(8)
+        }
+    }
+
+    private func transformRow(index: Int, t: ClipTransform) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: t.systemImage).foregroundStyle(.purple).frame(width: 16)
+            Text(t.name)
+            Spacer(minLength: 12)
+            Text((transformTarget.flatMap { t.apply($0.text) }) ?? "")
+                .lineLimit(1).truncationMode(.middle)
+                .font(.caption.monospaced())
+                .foregroundStyle(.tertiary)
+                .frame(maxWidth: 300, alignment: .trailing)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(
+            index == transformSelection ? Color.accentColor.opacity(0.25) : .clear,
+            in: RoundedRectangle(cornerRadius: 6)
+        )
+        .contentShape(Rectangle())
+        .onTapGesture { transformSelection = index; applyTransform(t) }
+    }
+
+    // MARK: - Banner / footer
+
     private var pasteGrantBanner: some View {
         HStack(spacing: 8) {
             Image(systemName: "bolt.fill").foregroundStyle(.orange)
@@ -146,7 +221,9 @@ struct PaletteView: View {
     }
 
     private var footer: some View {
-        Text("↑↓ move · ⏎ paste · ⌘1–9 quick · ⌘D favorite · ⌫ delete · esc close")
+        Text(transformTarget == nil
+             ? "↑↓ move · ⏎ paste · ⌘1–9 quick · ⌘K transform · ⌘D favorite · ⌫ delete · esc"
+             : "↑↓ move · ⏎ apply · esc back")
             .font(.caption2)
             .foregroundStyle(.tertiary)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -154,9 +231,61 @@ struct PaletteView: View {
             .padding(.vertical, 6)
     }
 
-    private func move(_ delta: Int) {
-        guard !results.isEmpty else { return }
-        selection = (selection + delta + results.count) % results.count
+    // MARK: - Actions
+
+    private func moveSelection(_ delta: Int) {
+        if transformTarget != nil {
+            guard !transforms.isEmpty else { return }
+            transformSelection = (transformSelection + delta + transforms.count) % transforms.count
+        } else {
+            guard !results.isEmpty else { return }
+            selection = (selection + delta + results.count) % results.count
+        }
+    }
+
+    private func commitSelection() {
+        if transformTarget != nil {
+            guard transforms.indices.contains(transformSelection) else { return }
+            applyTransform(transforms[transformSelection])
+        } else {
+            pasteSelected()
+        }
+    }
+
+    private func escapeAction() {
+        if transformTarget != nil {
+            transformTarget = nil
+            query = ""
+        } else {
+            onClose()
+        }
+    }
+
+    private func handleCommandKey(_ press: KeyPress) -> KeyPress.Result {
+        guard press.modifiers.contains(.command) else { return .ignored }
+        if press.characters == "k" { toggleTransformMode(); return .handled }
+        guard transformTarget == nil else { return .ignored }   // ⌘D / ⌘1–9 only in search mode
+        if press.characters == "d" { toggleFavoriteSelected(); return .handled }
+        if let n = press.characters.first?.wholeNumberValue, (1...9).contains(n) {
+            pasteVisible(at: n - 1); return .handled
+        }
+        return .ignored
+    }
+
+    private func toggleTransformMode() {
+        if transformTarget != nil {
+            transformTarget = nil
+            query = ""
+        } else if results.indices.contains(selection) {
+            transformTarget = results[selection]
+            transformSelection = 0
+            query = ""
+        }
+    }
+
+    private func applyTransform(_ t: ClipTransform) {
+        guard let target = transformTarget, let result = t.apply(target.text) else { return }
+        onPaste(result)
     }
 
     private func pasteSelected() {

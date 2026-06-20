@@ -50,10 +50,10 @@ final class PaletteController: NSObject {
         if isPaletteVisible { dismiss(paste: nil) } else { open() }
     }
 
-    func open() {
+    func open(transformIndex: Int? = nil) {
         guard !isPaletteVisible else { return }
         previousApp = NSWorkspace.shared.frontmostApplication
-        let panel = makePanel()   // fresh each open → field re-focuses + clean search
+        let panel = makePanel(transformIndex: transformIndex)   // fresh each open → field re-focuses + clean search
         self.panel = panel
         if let screen = NSScreen.main {
             let size = panel.frame.size
@@ -103,12 +103,13 @@ final class PaletteController: NSObject {
         return String(describing: type(of: fr))
     }
 
-    private func makePanel() -> CommandPalettePanel {
+    private func makePanel(transformIndex: Int? = nil) -> CommandPalettePanel {
         let panel = CommandPalettePanel(contentRect: NSRect(x: 0, y: 0, width: 640, height: 440))
         panel.delegate = self
         let root = PaletteView(
             onPaste: { [weak self] text in self?.dismiss(paste: text) },
-            onClose: { [weak self] in self?.dismiss(paste: nil) }
+            onClose: { [weak self] in self?.dismiss(paste: nil) },
+            initialTransformIndex: transformIndex
         )
         panel.contentView = NSHostingView(rootView: root)
         return panel

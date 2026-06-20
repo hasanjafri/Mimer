@@ -65,6 +65,10 @@ final class DebugBridge {
         case "pause": Preferences.shared.isPaused = true
         case "resume": Preferences.shared.isPaused = false
         case "snapshot": writeSnapshots()
+        case "transform":
+            if parts.count > 1, let index = Int(parts[1]) {
+                PaletteController.shared.open(transformIndex: index)
+            }
         default: break
         }
     }
