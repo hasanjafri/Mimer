@@ -38,6 +38,7 @@ targets:
         INFOPLIST_KEY_LSUIElement: YES          # menu-bar agent, no Dock icon
         INFOPLIST_KEY_NSHumanReadableCopyright: "Mimer — MIT-licensed."
         COMBINE_HIDPI_IMAGES: YES
+        CODE_SIGN_ENTITLEMENTS: Mimer.entitlements   # hardened runtime; sandbox explicitly off
 
   MimerTests:
     type: bundle.unit-test

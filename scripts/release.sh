@@ -31,6 +31,9 @@ if [ -z "${IDENTITY:-}" ]; then
   exit 1
 fi
 TEAM_ID=$(echo "$IDENTITY" | sed -E 's/.*\(([A-Z0-9]+)\)$/\1/')
+if [ "$(security find-identity -v -p codesigning | grep -c 'Developer ID Application')" -gt 1 ]; then
+  echo "⚠ Multiple 'Developer ID Application' identities found — using: $IDENTITY"
+fi
 echo "▸ Signing as: $IDENTITY  (team $TEAM_ID)"
 
 rm -rf "$BUILD"; mkdir -p "$BUILD"
@@ -56,6 +59,10 @@ PLIST
 xcodebuild -exportArchive -archivePath "$BUILD/Mimer.xcarchive" \
   -exportOptionsPlist "$BUILD/export.plist" -exportPath "$BUILD/export"
 
+echo "▸ Verifying signature + hardened runtime…"
+codesign --verify --deep --strict --verbose=1 "$APP"
+codesign --display --entitlements - "$APP" >/dev/null
+
 echo "▸ Building DMG…"
 STAGE="$BUILD/dmg"; mkdir -p "$STAGE"
 cp -R "$APP" "$STAGE/"
@@ -65,6 +72,8 @@ hdiutil create -volname "Mimer" -srcfolder "$STAGE" -ov -format UDZO "$DMG"
 echo "▸ Notarizing (this can take a few minutes)…"
 xcrun notarytool submit "$DMG" --keychain-profile "$NOTARY_PROFILE" --wait
 xcrun stapler staple "$DMG"
+xcrun stapler validate "$DMG"
+spctl --assess --type open --context context:primary-signature --verbose "$DMG" || true
 
 echo
 echo "✅ $DMG"

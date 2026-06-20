@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Non-sandboxed by design: Mimer needs the system clipboard, a global hotkey,
+         frontmost-app lookups, and CGEvent posting (auto-paste) — all blocked by the
+         App Sandbox. Declared explicitly so the hardened-runtime signing is unambiguous. -->
+    <key>com.apple.security.app-sandbox</key>
+    <false/>
+</dict>
+</plist>
