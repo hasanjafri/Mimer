@@ -69,6 +69,8 @@ final class DebugBridge {
             if parts.count > 1, let index = Int(parts[1]) {
                 PaletteController.shared.open(transformIndex: index)
             }
+        case "snippet":
+            if parts.count > 1 { ClipStore.shared.addSnippet(parts[1]) }
         default: break
         }
     }

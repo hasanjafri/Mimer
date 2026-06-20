@@ -21,8 +21,9 @@ struct PaletteView: View {
     @State private var transformSelection = 0
 
     private var results: [ClipItem] {
-        let all = store.items
-        return query.isEmpty ? all : all.filter { fuzzyMatch(query, $0.text) }
+        let snips = query.isEmpty ? store.snippets : store.snippets.filter { fuzzyMatch(query, $0.text) }
+        let hist = query.isEmpty ? store.items : store.items.filter { fuzzyMatch(query, $0.text) }
+        return snips + hist
     }
 
     private var transforms: [ClipTransform] {
@@ -88,19 +89,24 @@ struct PaletteView: View {
     // MARK: - Search results
 
     private var resultList: some View {
-        let showSections = results.contains(where: \.isFavorite) && results.contains(where: { !$0.isFavorite })
+        let showSections = Set(results.map(section(for:))).count > 1
         return ScrollView {
             LazyVStack(spacing: 2) {
                 ForEach(Array(results.enumerated()), id: \.element.id) { index, item in
-                    if showSections && index == 0 { sectionHeader("Favorites") }
-                    if showSections && index > 0 && results[index - 1].isFavorite && !item.isFavorite {
-                        sectionHeader("Recents")
+                    if showSections, index == 0 || section(for: results[index - 1]) != section(for: item) {
+                        sectionHeader(section(for: item))
                     }
                     resultRow(index: index, item: item)
                 }
             }
             .padding(8)
         }
+    }
+
+    private func section(for item: ClipItem) -> String {
+        if item.kind == .snippet { return "Snippets" }
+        if item.isFavorite { return "Favorites" }
+        return "Recents"
     }
 
     private func sectionHeader(_ title: String) -> some View {
