@@ -1,30 +1,97 @@
 # Mimer
 
-**A fast, beautiful, privacy-first clipboard manager for macOS — the keeper of your copy history.**
+**A fast, private, developer-first clipboard manager for macOS — free and open source.**
 
-Named after *Mímir*, the Norse guardian of memory and knowledge, Mimer remembers everything you copy — text, rich text, images, files, links — so you never lose a clip again. With permanent **Favorites that are saved forever**, instant fuzzy search, and a keyboard-first command palette.
+Named after *Mímir*, the Norse guardian of memory and knowledge, Mimer lives in
+your menu bar, remembers everything you copy, and gets out of the way until you
+press **⇧⌘V**. It does what CopyClip and Maccy do — and then keeps going: it
+understands what you copied (links, code, colors) and can *transform* it on the spot.
 
-## Why Mimer?
+> Status: pre-release. A working v1 (history, favorites, snippets, transforms);
+> building toward the first notarized release + Homebrew cask.
+
+---
+
+## Why Mimer
 
 Today's options each force a compromise:
 
 | App | The catch |
 |-----|-----------|
-| **CopyClip 2** ($7.99) | Text-only, dated UI; free version capped at 80 items to push the upgrade |
-| **Maccy** (free, OSS) | Great privacy, but minimal/developer-focused, no sync, no polish |
-| **Paste** ($29.99/yr) | Beautiful, but a *subscription* that stores your history in iCloud by default |
-| **macOS 26 built-in** | Text-only, items expire, no pins, no search, no exclusions |
+| **CopyClip 2** | "Favorites kept forever" is behind a purchase; dated, text-only UI |
+| **Maccy** (free, OSS) | Great privacy, but deliberately minimal — no transforms, no type-awareness |
+| **Paste** | Beautiful, but a *subscription* that stores history in iCloud by default |
+| **macOS built-in** | Text-only, items expire, no pins, no search, no exclusions |
 
-**Mimer combines the best of all of them:** Maccy's privacy + fair pricing, Paste's polish, full images/files support, permanent organized favorites, and a Raycast-grade command palette — **local-first, no subscription, beautifully native.**
+**Mimer's bet:** Maccy's privacy and fair (free) pricing, a Raycast-grade command
+palette, and a developer toolbelt nobody else has — type-aware clips and
+one-keystroke transforms — all local-first, no subscription, MIT-licensed.
 
-## Status
+## Features
 
-🚧 **Pre-development.** This repo currently holds the research, analysis, and the design + engineering plan.
+- **Clipboard history** — everything you copy, newest first, surviving restarts.
+- **Command palette (⇧⌘V)** — fuzzy search, ↑↓ to move, ⏎ to paste back into the app you were in.
+- **Quick-paste (⌘1–⌘9)** — grab one of the top results instantly.
+- **Type-aware clips** — links, code, and colors get their own glyph; hex colors show a live swatch.
+- **⌘K transforms** — for the selected clip: `UPPER`/`lower`/`Title`, trim, slugify, Base64 encode/decode, URL encode/decode, JSON pretty-print/minify — each with a live preview, and only the ones that actually apply.
+- **Favorites** — ⌘D (or the ★) keeps a clip forever, pinned in its own section.
+- **Snippets** — author reusable text (signatures, boilerplate) that lives in the palette forever.
+- **Pause + per-app exclusions** — stop recording on demand, or never record while chosen apps are frontmost. Password managers are always ignored.
+- **Auto-paste (optional)** — ⏎ pastes straight into your previous app once you grant the one permission; otherwise the clip is on your clipboard for ⌘V.
+- **Launch at login**, configurable history size, and a configurable menu height.
 
-- [`docs/RESEARCH.md`](docs/RESEARCH.md) — competitive research & market analysis
-- [`docs/DESIGN.md`](docs/DESIGN.md) — product concept & design direction
-- [`docs/PLAN.md`](docs/PLAN.md) — engineering plan & roadmap *(written once key decisions are locked)*
+Planned: rich types (images/files), paste-stack, more transforms.
+
+## Keyboard
+
+| Key | Action |
+| --- | --- |
+| `⇧⌘V` | Open / close the palette |
+| `↑` `↓` | Move selection |
+| `⏎` | Paste the selected clip |
+| `⌘1`–`⌘9` | Paste that result |
+| `⌘K` | Transform the selected clip |
+| `⌘D` | Favorite / unfavorite |
+| `⌫` | Delete the selected clip |
+| `esc` | Close (or leave transform mode) |
+
+## Privacy
+
+Mimer stores history in a local Core Data database under
+`~/Library/Application Support/Mimer/` and makes **no network requests**. It
+ignores clips marked transient/concealed/auto-generated (the standard
+`org.nspasteboard.*` hints password managers and other tools set) and ships with
+a built-in password-manager blocklist (1Password, Bitwarden, Apple Passwords,
+KeePassXC, …). Reading the clipboard needs no special permission; auto-paste is
+opt-in and uses macOS's post-event permission (not Accessibility).
+
+## Install
+
+**Build from source** (for now):
+
+```sh
+brew install xcodegen          # one-time
+git clone https://github.com/<you>/Mimer.git
+cd Mimer
+xcodegen generate              # writes Mimer.xcodeproj from project.yml
+open Mimer.xcodeproj           # ⌘R to run, or:
+xcodebuild -scheme Mimer -configuration Release build
+```
+
+Requires macOS 14+ and the Xcode command-line tools.
+
+A Homebrew cask (`brew install --cask mimer`) and a notarized direct download
+land with the first release.
 
 ## Tech
 
-Native macOS app — **Swift 6 / SwiftUI + AppKit**, built with **Xcode 26**. Local-first storage; optional iCloud sync planned.
+Swift + SwiftUI (`MenuBarExtra`) with an AppKit `NSPanel` for the nonactivating
+command palette, Core Data for history, and
+[KeyboardShortcuts](https://github.com/sindresorhus/KeyboardShortcuts) for the
+global hotkey. The Xcode project is generated from `project.yml` via
+[XcodeGen](https://github.com/yonaskolb/XcodeGen) (so the `.xcodeproj` is not
+committed). See [`docs/`](docs/) for the research, design, plan, and reviews.
+
+## License
+
+[MIT](LICENSE) — © 2026 Hasan Jafri.
