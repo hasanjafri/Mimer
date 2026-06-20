@@ -71,7 +71,7 @@ opt-in and uses macOS's post-event permission (not Accessibility).
 
 ```sh
 brew install xcodegen          # one-time
-git clone https://github.com/<you>/Mimer.git
+git clone https://github.com/hasanjafri/Mimer.git
 cd Mimer
 xcodegen generate              # writes Mimer.xcodeproj from project.yml
 open Mimer.xcodeproj           # ⌘R to run, or:
