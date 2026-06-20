@@ -27,7 +27,7 @@ final class CommandPalettePanel: NSPanel {
 
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
-    override func cancelOperation(_ sender: Any?) { orderOut(nil) }
+    override func cancelOperation(_ sender: Any?) { PaletteController.shared.close() }
 }
 
 /// Owns the palette panel: summon/dismiss, remembers the previously-frontmost
@@ -71,20 +71,24 @@ final class PaletteController: NSObject {
     func dismiss(paste text: String?) {
         guard !isDismissing else { return }
         isDismissing = true
-        defer { isDismissing = false }
 
+        panel?.delegate = nil          // avoid a dangling delegate / re-entrant resign during teardown
         panel?.orderOut(nil)
         panel = nil
-        guard let text else { return }
+
+        guard let text else { isDismissing = false; return }
 
         Paster.copyToPasteboard(text)
-        previousApp?.activate()
+        // Re-focus the app we came from (unless it's gone), then paste into it.
+        if previousApp?.isTerminated == false { previousApp?.activate() }
+
         // Only auto-paste if already permitted; otherwise the clip is on the
         // clipboard (the user presses ⌘V). Never prompt for the grant mid-paste —
         // the palette banner and onboarding handle enabling it, in context.
-        guard Paster.canPostEvents else { return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
+        guard Paster.canPostEvents else { isDismissing = false; return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) { [weak self] in
             Paster.synthesizePaste()
+            self?.isDismissing = false   // hold the reentrancy guard until the paste actually fires
         }
     }
 

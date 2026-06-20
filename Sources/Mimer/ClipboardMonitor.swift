@@ -31,9 +31,13 @@ final class ClipboardMonitor {
     func start() {
         guard timer == nil else { return }
         lastChangeCount = pasteboard.changeCount
-        timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+        // Run in .common modes so polling keeps firing during tracking loops
+        // (menu open, dragging the palette) instead of stalling in .default.
+        let timer = Timer(timeInterval: 0.5, repeats: true) { [weak self] _ in
             self?.captureIfChanged()
         }
+        RunLoop.main.add(timer, forMode: .common)
+        self.timer = timer
     }
 
     /// Detect a pasteboard change and forward the new text (if capturable).

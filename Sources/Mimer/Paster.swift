@@ -27,7 +27,9 @@ enum Paster {
     @discardableResult
     static func synthesizePaste() -> Bool {
         guard CGPreflightPostEventAccess() else { return false }
-        let source = CGEventSource(stateID: .combinedSessionState)
+        // .privateState avoids inheriting the user's live modifier state (e.g. a
+        // still-held ⇧ from ⇧⌘V turning the synthetic ⌘V into ⇧⌘V).
+        let source = CGEventSource(stateID: .privateState)
         let vKey = CGKeyCode(kVK_ANSI_V)
         guard
             let down = CGEvent(keyboardEventSource: source, virtualKey: vKey, keyDown: true),
