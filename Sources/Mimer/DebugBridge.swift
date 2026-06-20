@@ -1,13 +1,17 @@
 #if DEBUG
 import AppKit
 import Foundation
+import SwiftUI
 
 /// DEBUG-only test bridge so an automated agent (or you) can drive and inspect
 /// Mimer without GUI automation: it writes live state to `_debug_state.json` and
 /// executes commands written to `_debug_cmd`. Never compiled into release builds.
 ///
-/// Commands (write one to _debug_cmd): `open`, `close`, `paste <index>`.
-/// Inject clips for capture testing from the shell with `pbcopy` (no bridge needed).
+/// Commands (write one to _debug_cmd): `open`, `close`, `paste <i>`, `settings`,
+/// `fav <i>`, `delete <i>`, `pause`, `resume`, `snapshot`.
+/// `snapshot` renders Mimer's own windows to PNGs in `_snapshots/` (no Screen
+/// Recording permission needed — the app draws itself). Inject clips for capture
+/// testing from the shell with `pbcopy` (no bridge needed).
 @MainActor
 final class DebugBridge {
     static let shared = DebugBridge()
@@ -60,8 +64,53 @@ final class DebugBridge {
             }
         case "pause": Preferences.shared.isPaused = true
         case "resume": Preferences.shared.isPaused = false
+        case "snapshot": writeSnapshots()
         default: break
         }
+    }
+
+    /// DEBUG visual feedback: render Mimer's own surfaces to PNGs the agent can read.
+    /// Uses the app drawing itself (ImageRenderer / cacheDisplay), NOT screen capture —
+    /// so it needs no Screen Recording permission.
+    private func writeSnapshots() {
+        let snapDir = dir.appendingPathComponent("_snapshots", isDirectory: true)
+        try? FileManager.default.createDirectory(at: snapDir, withIntermediateDirectories: true)
+        for f in (try? FileManager.default.contentsOfDirectory(at: snapDir, includingPropertiesForKeys: nil)) ?? [] {
+            try? FileManager.default.removeItem(at: f)
+        }
+
+        func write(_ data: Data?, _ name: String) {
+            if let data { try? data.write(to: snapDir.appendingPathComponent(name)) }
+        }
+        func renderPNG<V: View>(_ view: V, width: CGFloat) -> Data? {
+            let renderer = ImageRenderer(content: view.frame(width: width))
+            renderer.scale = 2
+            guard let img = renderer.nsImage,
+                  let tiff = img.tiffRepresentation,
+                  let rep = NSBitmapImageRep(data: tiff) else { return nil }
+            return rep.representation(using: .png, properties: [:])
+        }
+        func livePNG(_ view: NSView) -> Data? {
+            guard view.bounds.width > 1, view.bounds.height > 1,
+                  let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return nil }
+            view.cacheDisplay(in: view.bounds, to: rep)
+            return rep.representation(using: .png, properties: [:])
+        }
+
+        // Deterministic standalone renders (always available, permission-free).
+        write(renderPNG(MenuBarView(), width: 320), "render-menu.png")
+        write(renderPNG(PaletteView(onPaste: { _ in }, onClose: {}), width: 640), "render-palette.png")
+        write(renderPNG(OnboardingView(onDone: {}), width: 440), "render-onboarding.png")
+
+        // Plus whatever live windows are on screen (real material/vibrancy).
+        var i = 0
+        for window in NSApp.windows where window.isVisible {
+            guard let v = window.contentView, let data = livePNG(v) else { continue }
+            let title = window.title.isEmpty ? "panel" : window.title.replacingOccurrences(of: " ", with: "_")
+            write(data, "live-\(i)-\(title).png")
+            i += 1
+        }
+        NSLog("Mimer snapshot → \(snapDir.path)")
     }
 
     private func writeState() {
