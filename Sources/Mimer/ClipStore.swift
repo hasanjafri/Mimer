@@ -77,6 +77,21 @@ final class ClipStore: ObservableObject {
         save(); refresh()
     }
 
+    /// Wipe the rolling history. Favorites and snippets are kept (they're explicitly saved).
+    func clearHistory() {
+        let request = NSFetchRequest<NSManagedObjectID>(entityName: "Clip")
+        request.resultType = .managedObjectIDResultType
+        request.predicate = NSPredicate(format: "isFavorite == NO AND kind != %d", ClipKind.snippet.rawValue)
+        guard let ids = try? context.fetch(request), !ids.isEmpty else { return }
+        let batch = NSBatchDeleteRequest(objectIDs: ids)
+        batch.resultType = .resultTypeObjectIDs
+        if let result = try? context.execute(batch) as? NSBatchDeleteResult,
+           let deleted = result.result as? [NSManagedObjectID] {
+            NSManagedObjectContext.mergeChanges(fromRemoteContextSave: [NSDeletedObjectsKey: deleted], into: [context])
+        }
+        refresh()
+    }
+
     /// Save an authored snippet (kept forever, exempt from pruning). Identical
     /// snippets are ignored; snippets never collide with captured history (the
     /// history dedupe is scoped to non-snippet kinds).

@@ -11,6 +11,8 @@ struct SettingsView: View {
                 .tabItem { Label("General", systemImage: "gearshape") }
             PrivacySettingsView()
                 .tabItem { Label("Privacy", systemImage: "hand.raised") }
+            AboutSettingsView()
+                .tabItem { Label("About", systemImage: "info.circle") }
         }
         .frame(width: 460, height: 360)
     }
@@ -52,6 +54,7 @@ private struct GeneralSettingsView: View {
 
 private struct PrivacySettingsView: View {
     @ObservedObject private var prefs = Preferences.shared
+    @State private var showClearConfirm = false
 
     var body: some View {
         Form {
@@ -85,6 +88,18 @@ private struct PrivacySettingsView: View {
             } footer: {
                 Text("Mimer won’t record while one of these apps is frontmost. Password managers are always ignored.")
             }
+
+            Section {
+                Button("Clear History…", role: .destructive) { showClearConfirm = true }
+                    .confirmationDialog("Clear all clipboard history?", isPresented: $showClearConfirm) {
+                        Button("Clear History", role: .destructive) { ClipStore.shared.clearHistory() }
+                        Button("Cancel", role: .cancel) {}
+                    } message: {
+                        Text("Removes your recent clips. Favorites and snippets are kept.")
+                    }
+            } footer: {
+                Text("History is stored locally and unencrypted under Application Support; clearing removes recent clips immediately.")
+            }
         }
         .formStyle(.grouped)
         .padding()
@@ -108,5 +123,38 @@ private struct PrivacySettingsView: View {
             return FileManager.default.displayName(atPath: url.path)
         }
         return bid
+    }
+}
+
+private struct AboutSettingsView: View {
+    private var version: String {
+        let info = Bundle.main.infoDictionary
+        let v = info?["CFBundleShortVersionString"] as? String ?? "—"
+        let b = info?["CFBundleVersion"] as? String ?? "—"
+        return "\(v) (\(b))"
+    }
+
+    var body: some View {
+        VStack(spacing: 10) {
+            Spacer()
+            Image(systemName: "doc.on.clipboard.fill")
+                .font(.system(size: 48))
+                .foregroundStyle(.tint)
+            Text("Mimer").font(.title.bold())
+            Text("Version \(version)").font(.callout).foregroundStyle(.secondary)
+            Text("A fast, private, developer-first clipboard manager.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+            HStack(spacing: 18) {
+                Link("GitHub", destination: URL(string: "https://github.com/hasanjafri/Mimer")!)
+                Link("License", destination: URL(string: "https://github.com/hasanjafri/Mimer/blob/main/LICENSE")!)
+            }
+            .padding(.top, 4)
+            Spacer()
+            Text("© 2026 Hasan Jafri · MIT").font(.caption2).foregroundStyle(.tertiary)
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
