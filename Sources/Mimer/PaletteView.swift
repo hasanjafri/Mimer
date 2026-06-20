@@ -78,11 +78,11 @@ struct PaletteView: View {
         }
         .onChange(of: query) { if transformTarget != nil { transformSelection = 0 } else { selection = 0 } }
         .onChange(of: results.count) { if selection >= results.count { selection = max(0, results.count - 1) } }
+        .onChange(of: transformTarget?.id) { DispatchQueue.main.async { searchFocused = true } }   // keep keys alive across modes
         .onKeyPress(.downArrow) { moveSelection(1); return .handled }
         .onKeyPress(.upArrow) { moveSelection(-1); return .handled }
         .onKeyPress(.return) { commitSelection(); return .handled }
         .onKeyPress(.escape) { escapeAction(); return .handled }
-        .onKeyPress(.delete) { guard transformTarget == nil else { return .ignored }; deleteSelected(); return .handled }
         .onKeyPress(phases: .down) { handleCommandKey($0) }
     }
 
@@ -228,7 +228,7 @@ struct PaletteView: View {
 
     private var footer: some View {
         Text(transformTarget == nil
-             ? "↑↓ move · ⏎ paste · ⌘1–9 quick · ⌘K transform · ⌘D favorite · ⌫ delete · esc"
+             ? "↑↓ move · ⏎ paste · ⌘1–9 quick · ⌘K transform · ⌘D favorite · ⌘⌫ delete · esc"
              : "↑↓ move · ⏎ apply · esc back")
             .font(.caption2)
             .foregroundStyle(.tertiary)
@@ -270,7 +270,10 @@ struct PaletteView: View {
     private func handleCommandKey(_ press: KeyPress) -> KeyPress.Result {
         guard press.modifiers.contains(.command) else { return .ignored }
         if press.characters == "k" { toggleTransformMode(); return .handled }
-        guard transformTarget == nil else { return .ignored }   // ⌘D / ⌘1–9 only in search mode
+        guard transformTarget == nil else { return .ignored }   // ⌘⌫ / ⌘D / ⌘1–9 only in search mode
+        if press.key == .delete || press.characters == "\u{7f}" || press.characters == "\u{8}" {
+            deleteSelected(); return .handled       // ⌘⌫ deletes the selected clip (plain ⌫ stays for editing the query)
+        }
         if press.characters == "d" { toggleFavoriteSelected(); return .handled }
         if let n = press.characters.first?.wholeNumberValue, (1...9).contains(n) {
             pasteVisible(at: n - 1); return .handled
@@ -291,6 +294,7 @@ struct PaletteView: View {
 
     private func applyTransform(_ t: ClipTransform) {
         guard let target = transformTarget, let result = t.apply(target.text) else { return }
+        store.insert(text: result)   // record the transformed value (the paste-back is RestoredType-skipped)
         onPaste(result)
     }
 
@@ -306,7 +310,11 @@ struct PaletteView: View {
 
     private func toggleFavoriteSelected() {
         guard results.indices.contains(selection) else { return }
-        store.toggleFavorite(results[selection].id)
+        let id = results[selection].id
+        store.toggleFavorite(id)
+        if let newIndex = results.firstIndex(where: { $0.id == id }) {
+            selection = newIndex   // favoriting reorders the list — follow the clip so the next action hits it
+        }
     }
 
     private func deleteSelected() {
