@@ -10,6 +10,12 @@ final class ClipTransformTests: XCTestCase {
         XCTAssertEqual(transform("b64enc").apply("Hello"), "SGVsbG8=")
         XCTAssertEqual(transform("b64dec").apply("SGVsbG8="), "Hello")
         XCTAssertNil(transform("b64dec").apply("not valid base64 !!!"))
+        XCTAssertNil(transform("b64dec").apply("test"))   // short word → not offered as base64
+    }
+
+    func testTitleCase() {
+        XCTAssertEqual(transform("title").apply("hello world"), "Hello World")
+        XCTAssertEqual(transform("title").apply("don't stop"), "Don't Stop")   // not "Don'T Stop"
     }
 
     func testURLEncoding() {

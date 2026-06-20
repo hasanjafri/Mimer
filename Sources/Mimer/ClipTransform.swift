@@ -20,7 +20,7 @@ struct ClipTransform: Identifiable {
     static let all: [ClipTransform] = [
         ClipTransform(id: "upper", name: "UPPERCASE", systemImage: "characters.uppercase") { $0.uppercased() },
         ClipTransform(id: "lower", name: "lowercase", systemImage: "characters.lowercase") { $0.lowercased() },
-        ClipTransform(id: "title", name: "Title Case", systemImage: "textformat") { $0.capitalized },
+        ClipTransform(id: "title", name: "Title Case", systemImage: "textformat") { titleCase($0) },
         ClipTransform(id: "trim", name: "Trim whitespace", systemImage: "wand.and.stars") {
             $0.trimmingCharacters(in: .whitespacesAndNewlines)
         },
@@ -29,7 +29,8 @@ struct ClipTransform: Identifiable {
             Data($0.utf8).base64EncodedString()
         },
         ClipTransform(id: "b64dec", name: "Base64 decode", systemImage: "lock.open") {
-            guard let d = Data(base64Encoded: $0.trimmingCharacters(in: .whitespacesAndNewlines)) else { return nil }
+            let trimmed = $0.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard isLikelyBase64(trimmed), let d = Data(base64Encoded: trimmed) else { return nil }
             return String(data: d, encoding: .utf8)
         },
         ClipTransform(id: "urlenc", name: "URL encode", systemImage: "percent") {
@@ -46,6 +47,20 @@ struct ClipTransform: Identifiable {
     /// so `&`, `=`, `?`, spaces, etc. are all escaped.
     private static let urlComponentAllowed = CharacterSet(charactersIn:
         "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")
+
+    private static func titleCase(_ s: String) -> String {
+        s.split(separator: " ", omittingEmptySubsequences: false).map { word -> String in
+            guard let first = word.first else { return String(word) }
+            return first.uppercased() + word.dropFirst()   // upcase first letter, leave the rest (keeps "iPhone", "don't")
+        }.joined(separator: " ")
+    }
+
+    /// Conservative "looks like base64" gate so the decode action isn't offered on
+    /// ordinary short words (e.g. "test"): base64 alphabet, padded length ≥ 8.
+    private static func isLikelyBase64(_ s: String) -> Bool {
+        guard s.count >= 8, s.count % 4 == 0 else { return false }
+        return s.allSatisfy { $0.isLetter || $0.isNumber || $0 == "+" || $0 == "/" || $0 == "=" }
+    }
 
     private static func slugify(_ s: String) -> String {
         let chars = s.lowercased().unicodeScalars.map { sc -> Character in

@@ -22,9 +22,14 @@ extension ClipKind {
 
         if !text.contains(where: \.isWhitespace) {
             let lower = text.lowercased()
-            if lower.hasPrefix("http://") || lower.hasPrefix("https://")
-                || lower.hasPrefix("www.") || lower.contains("://") {
-                return .link
+            if lower.hasPrefix("www.") { return .link }
+            // scheme://… with a real scheme (rejects stray "://" like "x:://y").
+            if let r = lower.range(of: "://") {
+                let scheme = lower[lower.startIndex..<r.lowerBound]
+                if let first = scheme.first, first.isLetter,
+                   scheme.allSatisfy({ $0.isLetter || $0.isNumber || $0 == "+" || $0 == "." || $0 == "-" }) {
+                    return .link
+                }
             }
         }
         if isHexColor(text) { return .color }
@@ -39,15 +44,20 @@ extension ClipKind {
     }
 
     private static func looksLikeCode(_ s: String) -> Bool {
-        if s.contains("{") && s.contains("}") { return true }
+        // Braces, but require a corroborating signal so prose like "Hi {name}" isn't
+        // flagged; JSON keeps its glyph via the `:"`-style signal.
+        if s.contains("{"), s.contains("}"),
+           s.contains(";") || s.contains("=") || s.contains("\n") || (s.contains(":") && s.contains("\"")) {
+            return true
+        }
         if s.contains("=>") || s.contains("</") || s.contains("/>") { return true }
-        if s.contains(";\n") || s.hasSuffix(";") { return true }
         let starts = ["func ", "def ", "const ", "function ", "import ",
                       "#include", "package ", "<?xml", "<!DOCTYPE", "SELECT "]
         let head = s.trimmingCharacters(in: .whitespacesAndNewlines)
         if starts.contains(where: { head.hasPrefix($0) }) { return true }
+        // Multi-line with consistent indentation (≥2 indented lines).
         let lines = s.split(separator: "\n", omittingEmptySubsequences: false)
-        if lines.count >= 2, lines.contains(where: { $0.hasPrefix("  ") || $0.hasPrefix("\t") }) {
+        if lines.count >= 2, lines.filter({ $0.hasPrefix("  ") || $0.hasPrefix("\t") }).count >= 2 {
             return true
         }
         return false
