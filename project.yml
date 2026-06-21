@@ -18,12 +18,15 @@ settings:
     ENABLE_HARDENED_RUNTIME: YES      # required for notarized direct distribution
 
 packages:
+  # Pinned to exact versions (not `from:` ranges) so a release can't pull a newer —
+  # possibly compromised — dependency into a signed, notarized, auto-updated build.
+  # Bump these deliberately and re-verify.
   KeyboardShortcuts:
     url: https://github.com/sindresorhus/KeyboardShortcuts
-    from: "2.0.0"
+    exactVersion: "2.4.0"
   Sparkle:
     url: https://github.com/sparkle-project/Sparkle
-    from: "2.5.0"
+    exactVersion: "2.9.3"
 
 targets:
   Mimer:

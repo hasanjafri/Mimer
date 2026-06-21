@@ -76,13 +76,23 @@ xcrun stapler validate "$DMG"
 spctl --assess --type open --context context:primary-signature --verbose "$DMG" || true
 
 # Update + sign the Sparkle appcast (uses your private EdDSA key from the keychain).
+# Required: a release that didn't refresh + sign the appcast would ship while
+# auto-update still points at the previous DMG, so fail loudly instead of skipping.
 GENAPPCAST=$(find ~/Library/Developer/Xcode/DerivedData/Mimer-*/SourcePackages -name generate_appcast -type f 2>/dev/null | head -1)
-if [ -n "$GENAPPCAST" ]; then
-  rm -rf "$BUILD/appcast-src"; mkdir -p "$BUILD/appcast-src"; cp "$DMG" "$BUILD/appcast-src/"
-  "$GENAPPCAST" --download-url-prefix "https://github.com/hasanjafri/Mimer/releases/download/v$VERSION/" \
-    "$BUILD/appcast-src" -o "$DIR/appcast.xml" \
-    && echo "▸ appcast.xml updated — commit + push it after creating the GitHub release"
+if [ -z "${GENAPPCAST:-}" ]; then
+  echo "✗ generate_appcast not found (Sparkle artifact). Build the project first so SPM resolves it."
+  exit 1
 fi
+rm -rf "$BUILD/appcast-src"; mkdir -p "$BUILD/appcast-src"; cp "$DMG" "$BUILD/appcast-src/"
+"$GENAPPCAST" --download-url-prefix "https://github.com/hasanjafri/Mimer/releases/download/v$VERSION/" \
+  "$BUILD/appcast-src" -o "$DIR/appcast.xml"
+# Verify this version actually made it into the signed feed (-F: dots in the
+# version are literal, not regex wildcards).
+if ! grep -qF "<sparkle:version>$VERSION</sparkle:version>" "$DIR/appcast.xml"; then
+  echo "✗ appcast.xml does not contain version $VERSION after generation"
+  exit 1
+fi
+echo "▸ appcast.xml updated + signed — commit + push it after creating the GitHub release"
 
 echo
 echo "✅ $DMG"
