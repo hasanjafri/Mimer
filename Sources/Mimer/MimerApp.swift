@@ -25,7 +25,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ClipStore.shared.loadInitial()
         let monitor = ClipboardMonitor(
             shouldCapture: { CaptureGate.captureAllowed() },
-            onCapture: { text in ClipStore.shared.insert(text: text) }
+            onCapture: { text in
+                // The frontmost app at capture time is (best-effort) where the clip came from.
+                ClipStore.shared.insert(text: text, sourceApp: NSWorkspace.shared.frontmostApplication?.localizedName)
+            }
         )
         monitor.start()
         self.monitor = monitor

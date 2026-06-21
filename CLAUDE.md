@@ -62,6 +62,10 @@ Typical loop: edit → `xcodebuild build` → relaunch the Debug app → drive v
   (`kTCCServicePostEvent`, `.privateState` source — not Accessibility, not AppleScript).
 - `CaptureGate` — pause + per-app exclusions + a password-manager bundle blocklist
   (belt-and-suspenders with ConcealedType, which is the primary defense).
+- `Clip.sourceApp` — localized name of the frontmost app at capture time (best-effort,
+  read from `NSWorkspace` in the monitor's `onCapture`); additive, optional, **unencrypted**
+  (it's metadata, and must be queryable for `app:` filtering). Shown dimmed in the row;
+  filterable via `app:`. Old clips have nil. Lightweight-migrates (CloudKit-valid).
 - `ClipStore` (`@MainActor`, Core Data) — projection (dictionary) fetch, batch-delete
   prune (**favorites + snippets exempt**), keyed-HMAC `contentHash` dedupe; exposes `items`
   (history) and `snippets`; `save()` rolls back on failure. **Encrypts at rest:** `text` is
@@ -96,8 +100,9 @@ Typical loop: edit → `xcodebuild build` → relaunch the Debug app → drive v
   `docs/ROADMAP.md` (JSON→type, diff two clips, chains, paste-as-plain next).
 - `SearchQuery` — parses the palette search box into composable filters: `type:<kind>`
   (link/code/color/sha/issue/file/snippet/image), `type:secret`/`is:secret` (live detection,
-  works on old clips), `is:fav`, and `/regex/` (case-insensitive; invalid → literal fuzzy) —
-  the leftover text stays a fuzzy match. Pure + testable; plain queries behave as before.
+  works on old clips), `is:fav`, `app:<name>` (case-insensitive substring of the capturing
+  app), and `/regex/` (case-insensitive; invalid → literal fuzzy) — the leftover text stays a
+  fuzzy match. Pure + testable; plain queries behave as before.
 - `PasteStack` — ordered, deduped queue of clip ids (⇥ toggles membership; resolves to live
   `ClipItem`s at paste time, dropping deleted clips). Pure + testable; resets each palette open.
 - `CommandPalettePanel` (nonactivating `NSPanel`, `canBecomeKey`) + `PaletteView` — the
@@ -160,7 +165,7 @@ filters as hygiene; defer OCR. Full sequenced plan + risks + design invariants i
 Shipped since 0.2.1 (unreleased on `main`): **secret detection + masking** (`SecretDetector`),
 **encrypt history at rest** (`Cryptor`, AES-GCM + Keychain key, lazy migration + vacuum), and
 **developer-domain awareness** (type detection + ⌘O config-free act-on via `ClipAction`), and
-**scoped/regex search** (`SearchQuery` — `type:`/`is:`/`/regex/`) and **paste-stack**
-(`PasteStack` — ⇥ queue, ⇧⏎ paste in order). Next in flight: `app:` scoping (source-app
-capture), the configurable act-on integrations (open commit/issue/editor, Settings →
-Developer), and more transforms.
+**scoped/regex search** (`SearchQuery` — `type:`/`is:`/`app:`/`/regex/`, with `Clip.sourceApp`
+capture) and **paste-stack** (`PasteStack` — ⇥ queue, ⇧⏎ paste in order). Next in flight: the
+configurable act-on integrations (open commit/issue/editor, Settings → Developer), and more
+transforms.

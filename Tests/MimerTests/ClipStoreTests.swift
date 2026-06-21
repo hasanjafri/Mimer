@@ -18,6 +18,14 @@ final class ClipStoreTests: XCTestCase {
         return store
     }
 
+    func testCapturesSourceApp() {
+        let store = makeStore()
+        store.insert(text: "from terminal", sourceApp: "Terminal")
+        store.insert(text: "no source")
+        XCTAssertEqual(store.items.first(where: { $0.text == "from terminal" })?.sourceApp, "Terminal")
+        XCTAssertNil(store.items.first(where: { $0.text == "no source" })?.sourceApp)
+    }
+
     func testInsertOrdersNewestFirst() {
         let store = makeStore()
         store.insert(text: "alpha")

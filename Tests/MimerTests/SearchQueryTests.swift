@@ -3,8 +3,25 @@ import Foundation
 @testable import Mimer
 
 final class SearchQueryTests: XCTestCase {
-    private func item(_ text: String, kind: ClipKind = .text, fav: Bool = false) -> ClipItem {
-        ClipItem(id: UUID(), text: text, kind: kind, createdAt: Date(), isFavorite: fav)
+    private func item(_ text: String, kind: ClipKind = .text, fav: Bool = false, app: String? = nil) -> ClipItem {
+        ClipItem(id: UUID(), text: text, kind: kind, createdAt: Date(), isFavorite: fav, sourceApp: app)
+    }
+
+    func testAppFilterMatchesSourceAppCaseInsensitively() {
+        let q = SearchQuery.parse("app:safari")
+        XCTAssertEqual(q.appFilter, "safari")
+        XCTAssertTrue(q.matches(item("x", app: "Safari")))
+        XCTAssertTrue(q.matches(item("x", app: "Safari Technology Preview")))   // substring
+        XCTAssertFalse(q.matches(item("x", app: "Terminal")))
+        XCTAssertFalse(q.matches(item("x", app: nil)))                          // no source → excluded
+    }
+
+    func testAppPlusTextComposes() {
+        let q = SearchQuery.parse("app:Terminal git")
+        XCTAssertEqual(q.appFilter, "Terminal")
+        XCTAssertEqual(q.text, "git")
+        XCTAssertTrue(q.matches(item("git status", app: "Terminal")))
+        XCTAssertFalse(q.matches(item("npm install", app: "Terminal")))   // fuzzy "git" fails
     }
 
     func testEmptyMatchesAll() {

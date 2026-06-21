@@ -161,6 +161,9 @@ struct PaletteView: View {
                     .frame(width: 16, height: 16)
                     .background(Color.accentColor, in: Circle())
             }
+            if let app = item.sourceApp, !app.isEmpty {
+                Text(app).font(.caption2).foregroundStyle(.tertiary).lineLimit(1)
+            }
             if item.isFavorite {
                 Image(systemName: "star.fill").font(.caption).foregroundStyle(.yellow)
             }
@@ -204,7 +207,7 @@ struct PaletteView: View {
             Text(store.items.isEmpty ? "Copy some text and it appears here." : "Try a different search.")
                 .font(.callout).foregroundStyle(.secondary)
             if !store.items.isEmpty {
-                Text("Filters: type:link · type:secret · is:fav · /regex/")
+                Text("Filters: type:link · type:secret · app:Safari · is:fav · /regex/")
                     .font(.caption2.monospaced()).foregroundStyle(.tertiary)
             }
             Spacer()

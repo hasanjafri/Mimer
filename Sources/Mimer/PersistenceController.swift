@@ -145,7 +145,8 @@ final class PersistenceController {
             attribute("kind", .integer16AttributeType, defaultValue: 0),
             attribute("createdAt", .dateAttributeType),
             attribute("lastUsedAt", .dateAttributeType),
-            attribute("isFavorite", .booleanAttributeType, defaultValue: false)
+            attribute("isFavorite", .booleanAttributeType, defaultValue: false),
+            attribute("sourceApp", .stringAttributeType)   // additive, optional → lightweight migration
         ]
         model.entities = [clip]
         return model

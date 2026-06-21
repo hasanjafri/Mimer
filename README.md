@@ -34,7 +34,7 @@ one-keystroke transforms — all local-first, no subscription, MIT-licensed.
 
 - **Clipboard history** — everything you copy, newest first, surviving restarts.
 - **Command palette (⇧⌘V)** — fuzzy search, ↑↓ to move, ⏎ to paste back into the app you were in.
-- **Scoped search** — filter as you type: `type:link` (or `code`/`color`/`sha`/`issue`/`file`/`snippet`), `type:secret`, `is:fav`, and `/regex/` — combine with text, e.g. `type:link react`.
+- **Scoped search** — filter as you type: `type:link` (or `code`/`color`/`sha`/`issue`/`file`/`snippet`), `type:secret`, `app:Safari` (where you copied it), `is:fav`, and `/regex/` — combine with text, e.g. `app:Terminal git`.
 - **Quick-paste (⌘1–⌘9)** — grab one of the top results instantly.
 - **Paste-stack** — press **⇥** to queue several clips (numbered in order), then **⇧⏎** to paste them all in sequence — great for filling forms or assembling something from parts.
 - **Type-aware clips** — links, code, colors, **git SHAs, issue keys (`ABC-123`), and file paths / stack-trace `file:line`** each get their own glyph; hex colors show a live swatch.

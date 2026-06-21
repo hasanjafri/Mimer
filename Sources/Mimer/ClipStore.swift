@@ -41,7 +41,7 @@ final class ClipStore: ObservableObject {
         refresh()
     }
 
-    func insert(text: String) {
+    func insert(text: String, sourceApp: String? = nil) {
         let now = Date()
         let hash = cryptor.dedupeHash(text)
 
@@ -62,6 +62,7 @@ final class ClipStore: ObservableObject {
             clip.createdAt = now
             clip.lastUsedAt = now
             clip.isFavorite = false
+            clip.sourceApp = sourceApp
         }
 
         // Only prune + pulse if the capture actually persisted — never batch-delete history
@@ -201,7 +202,7 @@ final class ClipStore: ObservableObject {
         request.resultType = .dictionaryResultType
         request.includesPendingChanges = false
         request.predicate = predicate
-        request.propertiesToFetch = ["id", "text", "kind", "createdAt", "isFavorite"]
+        request.propertiesToFetch = ["id", "text", "kind", "createdAt", "isFavorite", "sourceApp"]
         request.sortDescriptors = sort
         let rows = (try? context.fetch(request)) ?? []
         return rows.compactMap { row in
@@ -219,7 +220,8 @@ final class ClipStore: ObservableObject {
                 text: text,
                 kind: ClipKind(rawValue: kindRaw) ?? .text,
                 createdAt: createdAt,
-                isFavorite: isFavorite
+                isFavorite: isFavorite,
+                sourceApp: row["sourceApp"] as? String
             )
         }
     }
