@@ -178,28 +178,40 @@ struct ClipTransform: Identifiable {
 
     /// Generate a TypeScript `interface Root { … }` from a top-level JSON object (nested
     /// objects inline). Returns nil for non-object JSON or non-JSON, so it stays hidden.
+    /// Bounded by input size and recursion depth so a huge/deep clip can't stall the palette.
     private static func jsonToTypeScript(_ s: String) -> String? {
-        guard let obj = try? JSONSerialization.jsonObject(with: Data(s.utf8)) as? [String: Any] else { return nil }
-        return "interface Root " + tsObject(obj, indent: 0)
+        guard s.utf8.count <= 200_000,
+              let obj = try? JSONSerialization.jsonObject(with: Data(s.utf8)) as? [String: Any] else { return nil }
+        return "interface Root " + tsObject(obj, indent: 0, depth: 0)
     }
 
-    private static func tsObject(_ obj: [String: Any], indent: Int) -> String {
+    private static let tsMaxDepth = 32
+
+    private static func tsObject(_ obj: [String: Any], indent: Int, depth: Int) -> String {
         guard !obj.isEmpty else { return "{}" }
+        guard depth < tsMaxDepth else { return "any" }
         let pad = String(repeating: "  ", count: indent + 1)
         let close = String(repeating: "  ", count: indent)
         let body = obj.keys.sorted().map { key -> String in
-            let k = isTSIdentifier(key) ? key : "\"\(key)\""
-            return "\(pad)\(k): \(tsType(obj[key]!, indent: indent + 1));"
+            let k = isTSIdentifier(key) ? key : tsStringLiteral(key)
+            return "\(pad)\(k): \(tsType(obj[key]!, indent: indent + 1, depth: depth + 1));"
         }.joined(separator: "\n")
         return "{\n\(body)\n\(close)}"
     }
 
-    private static func tsType(_ value: Any, indent: Int) -> String {
+    private static func tsType(_ value: Any, indent: Int, depth: Int) -> String {
+        if depth >= tsMaxDepth { return "any" }
         if value is NSNull { return "null" }
         if let n = value as? NSNumber { return CFGetTypeID(n) == CFBooleanGetTypeID() ? "boolean" : "number" }
         if value is String { return "string" }
-        if let arr = value as? [Any] { return (arr.first.map { tsType($0, indent: indent) } ?? "any") + "[]" }
-        if let obj = value as? [String: Any] { return tsObject(obj, indent: indent) }
+        if let arr = value as? [Any] {
+            guard !arr.isEmpty else { return "any[]" }
+            // Union across a sample of elements, so [1,"x"] → (number | string)[], not number[].
+            let types = Set(arr.prefix(50).map { tsType($0, indent: indent, depth: depth + 1) }).sorted()
+            let union = types.joined(separator: " | ")
+            return types.count == 1 ? "\(union)[]" : "(\(union))[]"
+        }
+        if let obj = value as? [String: Any] { return tsObject(obj, indent: indent, depth: depth + 1) }
         return "any"
     }
 
@@ -207,50 +219,73 @@ struct ClipTransform: Identifiable {
         s.range(of: #"^[A-Za-z_$][A-Za-z0-9_$]*$"#, options: .regularExpression) != nil
     }
 
+    /// A double-quoted TS string literal with backslash/quote escaping (for non-identifier keys).
+    private static func tsStringLiteral(_ s: String) -> String {
+        "\"" + s.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") + "\""
+    }
+
     // MARK: - Line transforms (multi-line only, so they stay hidden for single-line clips)
 
-    private static func sortLines(_ s: String) -> String? {
-        let lines = s.components(separatedBy: "\n")
+    /// Apply `op` to the logical lines, ignoring a single trailing newline (so `"x\n"` reads
+    /// as one line → hidden) and restoring it afterward. Returns nil for <2 logical lines.
+    private static func lineOp(_ s: String, _ op: ([String]) -> [String]) -> String? {
+        let hadTrailingNewline = s.hasSuffix("\n")
+        let body = hadTrailingNewline ? String(s.dropLast()) : s
+        let lines = body.components(separatedBy: "\n")
         guard lines.count >= 2 else { return nil }
-        return lines.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }.joined(separator: "\n")
+        let out = op(lines).joined(separator: "\n")
+        return hadTrailingNewline ? out + "\n" : out
+    }
+
+    private static func sortLines(_ s: String) -> String? {
+        lineOp(s) { $0.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending } }
     }
 
     private static func dedupeLines(_ s: String) -> String? {
-        let lines = s.components(separatedBy: "\n")
-        guard lines.count >= 2 else { return nil }
-        var seen = Set<String>()
-        return lines.filter { seen.insert($0).inserted }.joined(separator: "\n")   // applicable() hides if no dups
+        lineOp(s) { lines in var seen = Set<String>(); return lines.filter { seen.insert($0).inserted } }
     }
 
     private static func reverseLines(_ s: String) -> String? {
-        let lines = s.components(separatedBy: "\n")
-        guard lines.count >= 2 else { return nil }
-        return lines.reversed().joined(separator: "\n")
+        lineOp(s) { $0.reversed() }
     }
 
     // MARK: - Case transforms (identifier-like phrases only, so they stay off prose)
 
-    /// Split an identifier-ish phrase into words on separators AND camelCase boundaries.
-    /// nil (→ transform hidden) unless it's a short single line of letters/digits/`_-` + spaces.
+    /// Split an identifier-ish phrase into words on separators AND camelCase/acronym boundaries
+    /// (`parseURLValue` → parse·URL·Value). nil (→ hidden) unless it's a short single line of
+    /// letters/digits/`_-`+spaces that looks like an identifier — multi-word prose is rejected.
     private static func identifierWords(_ s: String) -> [String]? {
         let t = s.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !t.isEmpty, !t.contains("\n"), t.count <= 60,
               t.allSatisfy({ $0.isLetter || $0.isNumber || $0 == " " || $0 == "_" || $0 == "-" }) else { return nil }
+
+        let chars = Array(t)
         var words: [String] = []
         var cur = ""
-        var prevCased = false   // previous char was a lowercase letter or digit
-        for ch in t {
+        for (i, ch) in chars.enumerated() {
             if ch == " " || ch == "_" || ch == "-" {
                 if !cur.isEmpty { words.append(cur); cur = "" }
-                prevCased = false
-            } else {
-                if ch.isUppercase, prevCased { words.append(cur); cur = "" }   // camelCase boundary
-                cur.append(ch)
-                prevCased = ch.isLowercase || ch.isNumber
+                continue
             }
+            if let prev = cur.last {
+                let nextLower = i + 1 < chars.count && chars[i + 1].isLowercase
+                if ch.isUppercase, prev.isLowercase || prev.isNumber {
+                    words.append(cur); cur = ""                       // camelCase boundary
+                } else if ch.isUppercase, prev.isUppercase, nextLower {
+                    words.append(cur); cur = ""                       // acronym→word boundary (URLValue → URL·Value)
+                }
+            }
+            cur.append(ch)
         }
         if !cur.isEmpty { words.append(cur) }
-        return words.isEmpty ? nil : words
+        guard !words.isEmpty else { return nil }
+
+        // Prose guard: if the splitter found no more words than plain space-splitting would
+        // (i.e. no `_`/`-`/camel/acronym signal — just separate words) and there are >3 of
+        // them, treat it as prose, not an identifier (e.g. "This is just prose") and hide.
+        let spaceWords = t.split(separator: " ", omittingEmptySubsequences: true).count
+        if words.count <= spaceWords && words.count > 3 { return nil }
+        return words
     }
 
     private static func camelCase(_ s: String) -> String? {

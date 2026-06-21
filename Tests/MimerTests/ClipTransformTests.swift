@@ -97,12 +97,24 @@ final class ClipTransformTests: XCTestCase {
         XCTAssertNil(transform("json2ts").apply("just prose"))
     }
 
+    func testJSONToTypeScriptEdgeCases() {
+        // Heterogeneous array → union, not just the first element's type.
+        XCTAssertTrue(transform("json2ts").apply("{\"x\":[1,\"a\"]}")!.contains("x: (number | string)[];"))
+        XCTAssertTrue(transform("json2ts").apply("{\"x\":[]}")!.contains("x: any[];"))
+        // Non-identifier key is escaped, not emitted raw.
+        let escaped = transform("json2ts").apply("{\"a\\\"b\":1}")!
+        XCTAssertTrue(escaped.contains("\"a\\\"b\": number;"))
+        XCTAssertFalse(escaped.contains("\"a\"b\""))   // not the broken/unescaped form
+    }
+
     func testLineOps() {
         XCTAssertEqual(transform("sortlines").apply("banana\napple\ncherry"), "apple\nbanana\ncherry")
         XCTAssertEqual(transform("dedupelines").apply("a\nb\na\nc\nb"), "a\nb\nc")
         XCTAssertEqual(transform("reverselines").apply("1\n2\n3"), "3\n2\n1")
         XCTAssertNil(transform("sortlines").apply("single line"))           // single line → hidden
         XCTAssertNil(transform("reverselines").apply("single line"))
+        XCTAssertNil(transform("sortlines").apply("single line\n"))         // trailing newline ≠ a second line
+        XCTAssertEqual(transform("sortlines").apply("b\na\n"), "a\nb\n")    // trailing newline preserved
         // dedupe with no duplicates is hidden by applicable() (output == input)
         XCTAssertFalse(ClipTransform.applicable(to: "a\nb\nc").contains { $0.id == "dedupelines" })
         XCTAssertTrue(ClipTransform.applicable(to: "a\nb\na").contains { $0.id == "dedupelines" })
@@ -113,7 +125,9 @@ final class ClipTransformTests: XCTestCase {
         XCTAssertEqual(transform("camel").apply("user_profile_id"), "userProfileId")
         XCTAssertEqual(transform("snake").apply("userName"), "user_name")          // camelCase boundary split
         XCTAssertEqual(transform("snake").apply("User Profile ID"), "user_profile_id")
-        XCTAssertNil(transform("camel").apply("This is a full sentence, with punctuation."))  // prose → hidden
+        XCTAssertEqual(transform("snake").apply("parseURLValue"), "parse_url_value")  // acronym boundary
+        XCTAssertNil(transform("camel").apply("This is just prose"))                // 4-word prose, no signal → hidden
+        XCTAssertNil(transform("camel").apply("a full sentence, with punctuation.")) // punctuation → hidden
         XCTAssertNil(transform("snake").apply("multi\nline"))                       // not a single identifier-ish line
     }
 }
