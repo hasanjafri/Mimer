@@ -55,12 +55,22 @@ struct SearchQuery {
         let trimmed = text.trimmingCharacters(in: .whitespaces)
         if trimmed.count >= 2, trimmed.count <= maxRegexPattern, trimmed.hasPrefix("/"), trimmed.hasSuffix("/") {
             let pattern = String(trimmed.dropFirst().dropLast())
-            q.regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive])
-            if q.regex == nil { q.text = text }   // invalid regex → fall back to literal fuzzy
+            if !looksCatastrophic(pattern) {
+                q.regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive])
+            }
+            if q.regex == nil { q.text = text }   // invalid/risky regex → fall back to literal fuzzy
         } else {
             q.text = text   // (an over-long /…/ also falls through to literal fuzzy)
         }
         return q
+    }
+
+    /// Best-effort rejection of the classic exponential-backtracking shapes (a quantified
+    /// group that itself contains a quantifier — `(a+)+`, `(.*)*`, `(x+){2,}`). NSRegularExpression
+    /// has no timeout, and this filters runs on the main thread, so a risky pattern is treated
+    /// as literal text instead. Not exhaustive — it's the user's own pattern on their own clips.
+    private static func looksCatastrophic(_ pattern: String) -> Bool {
+        pattern.range(of: #"\([^()]*[+*}][^()]*\)[*+{]"#, options: .regularExpression) != nil
     }
 
     /// True if no filters and no text — the palette can skip filtering entirely.

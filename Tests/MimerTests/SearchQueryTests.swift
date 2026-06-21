@@ -81,6 +81,17 @@ final class SearchQueryTests: XCTestCase {
         XCTAssertEqual(q.text, long)       // treated literally
     }
 
+    func testRejectsCatastrophicRegexAsLiteral() {
+        // Nested-quantifier ReDoS shapes are not compiled (would freeze the main thread).
+        for risky in ["/(a+)+$/", "/(.*)*/", "/(x+){2,}/"] {
+            let q = SearchQuery.parse(risky)
+            XCTAssertNil(q.regex, "\(risky) should not compile")
+            XCTAssertEqual(q.text, risky, "\(risky) falls back to literal")
+        }
+        // A safe quantified group still compiles.
+        XCTAssertNotNil(SearchQuery.parse("/(ab)+/").regex)
+    }
+
     func testUnknownTypeIsLiteralText() {
         let q = SearchQuery.parse("type:bogus")
         XCTAssertNil(q.kinds)
