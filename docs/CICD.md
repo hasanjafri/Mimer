@@ -2,6 +2,16 @@
 
 Two GitHub Actions workflows, plus branch protection on `main`.
 
+## Supply-chain hardening
+
+- **Dependencies are pinned to exact versions** in `project.yml` (`exactVersion:`,
+  not `from:` ranges) so a release can't pull a newer, possibly compromised, SPM
+  dependency into a signed/notarized build. Bump them deliberately and re-verify.
+- **Actions are pinned to a commit SHA** (`actions/checkout@<sha> # v4.x`), not a
+  mutable tag.
+- The **release job runs the test suite before any signing key is imported**, so
+  build/test code never executes alongside the Developer ID cert or Sparkle key.
+
 ## CI — `.github/workflows/ci.yml`
 
 Runs on every **PR to `main`** and every **push to `main`**:

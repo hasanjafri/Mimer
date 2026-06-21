@@ -49,7 +49,7 @@ jobs:
     # Only the repository owner can cut a release — a merged contributor cannot.
     if: github.actor == github.repository_owner
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           ref: main
           fetch-depth: 0
@@ -87,6 +87,20 @@ jobs:
           if git ls-remote --exit-code --tags origin "${{ steps.ver.outputs.tag }}" >/dev/null 2>&1; then
             echo "::error::Tag ${{ steps.ver.outputs.tag }} already exists on origin"; exit 1
           fi
+
+      - name: Generate project + resolve packages
+        run: |
+          set -euo pipefail
+          xcodegen generate
+          xcodebuild -project Mimer.xcodeproj -scheme Mimer -resolvePackageDependencies >/dev/null
+
+      - name: Test (release must pass the suite before it ships)
+        # Runs BEFORE any signing material is in the keychain, so build/test code
+        # never executes alongside the Developer ID cert or the Sparkle key.
+        run: |
+          set -o pipefail
+          xcodebuild -project Mimer.xcodeproj -scheme Mimer -configuration Debug \
+            -destination 'platform=macOS,arch=arm64' CODE_SIGNING_ALLOWED=NO test
 
       - name: Set up signing keychain
         env:
@@ -129,21 +143,13 @@ jobs:
           SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
         run: |
           set -euo pipefail
-          # generate_keys ships as a prebuilt binary in the Sparkle SwiftPM artifact;
-          # resolve packages so it (and generate_appcast) are on disk before signing.
-          xcodegen generate
-          xcodebuild -project Mimer.xcodeproj -scheme Mimer -resolvePackageDependencies >/dev/null
+          # generate_keys ships as a prebuilt binary in the Sparkle SwiftPM artifact
+          # (packages were resolved above). Import the key last — right before signing.
           GK=$(find ~/Library/Developer/Xcode/DerivedData/Mimer-*/SourcePackages -name generate_keys -type f 2>/dev/null | head -1)
           if [ -z "$GK" ]; then echo "::error::generate_keys not found after package resolution"; exit 1; fi
           printf '%s' "$SPARKLE_PRIVATE_KEY" > "$RUNNER_TEMP/sparkle_key"
           "$GK" -f "$RUNNER_TEMP/sparkle_key"   # import into the (default) signing keychain
           rm -f "$RUNNER_TEMP/sparkle_key"
-
-      - name: Test (release must pass the suite before it ships)
-        run: |
-          set -o pipefail
-          xcodebuild -project Mimer.xcodeproj -scheme Mimer -configuration Debug \
-            -destination 'platform=macOS,arch=arm64' CODE_SIGNING_ALLOWED=NO test
 
       - name: Build, sign, notarize, package (+ sign appcast)
         run: scripts/release.sh "${{ steps.ver.outputs.next }}"
