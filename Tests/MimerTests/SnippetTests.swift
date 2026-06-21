@@ -1,10 +1,16 @@
 import XCTest
+import CryptoKit
 @testable import Mimer
 
 @MainActor
 final class SnippetTests: XCTestCase {
     private func makeStore() -> ClipStore {
-        ClipStore(persistence: PersistenceController(inMemory: true))
+        let store = ClipStore(
+            persistence: PersistenceController(inMemory: true),
+            cryptor: Cryptor(key: SymmetricKey(data: Data(repeating: 9, count: 32)))
+        )
+        store.loadInitial()
+        return store
     }
 
     func testAddSnippetAppearsInSnippetsNotHistory() {
