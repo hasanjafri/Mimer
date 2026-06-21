@@ -64,10 +64,13 @@ final class ClipStore: ObservableObject {
             clip.isFavorite = false
         }
 
-        save()        // persist before pruning (batch delete operates on the store)
-        prune()
+        // Only prune + pulse if the capture actually persisted — never batch-delete history
+        // on the back of a failed (rolled-back) save.
+        if save() {
+            prune()             // persist before pruning (batch delete operates on the store)
+            captureTick &+= 1   // pulse the menu-bar icon
+        }
         refresh()
-        captureTick &+= 1   // pulse the menu-bar icon
     }
 
     func toggleFavorite(_ id: UUID) {
@@ -242,7 +245,11 @@ final class ClipStore: ObservableObject {
             rewrote = true
         }
         guard rewrote else { return }
-        persistence.vacuumPending = true   // persisted before the save → survives a crash
-        if !save() { persistence.vacuumPending = false }   // rolled back → nothing to scrub
+        // Mark a scrub pending BEFORE saving so a crash after the commit still vacuums next
+        // launch. Never clear it here: a failed save just rolls the rows back to plaintext
+        // (retried next launch), and clearing could wipe a *prior* launch's unscrubbed debt.
+        // The marker is cleared only by a confirmed vacuum in loadInitial().
+        persistence.vacuumPending = true
+        save()
     }
 }
