@@ -138,20 +138,12 @@ jobs:
             --apple-id "$NOTARY_APPLE_ID" --team-id "$NOTARY_TEAM_ID" --password "$NOTARY_PASSWORD" \
             --keychain "$KC"
 
-      - name: Import Sparkle signing key
-        env:
-          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
-        run: |
-          set -euo pipefail
-          # generate_keys ships as a prebuilt binary in the Sparkle SwiftPM artifact
-          # (packages were resolved above). Import the key last — right before signing.
-          GK=$(find ~/Library/Developer/Xcode/DerivedData/Mimer-*/SourcePackages -name generate_keys -type f 2>/dev/null | head -1)
-          if [ -z "$GK" ]; then echo "::error::generate_keys not found after package resolution"; exit 1; fi
-          printf '%s' "$SPARKLE_PRIVATE_KEY" > "$RUNNER_TEMP/sparkle_key"
-          "$GK" -f "$RUNNER_TEMP/sparkle_key"   # import into the (default) signing keychain
-          rm -f "$RUNNER_TEMP/sparkle_key"
-
       - name: Build, sign, notarize, package (+ sign appcast)
+        # SPARKLE_ED_KEY is piped to generate_appcast via --ed-key-file - (stdin),
+        # so the EdDSA key never enters the keychain — no non-interactive keychain
+        # prompt to hang on, and nothing left at rest.
+        env:
+          SPARKLE_ED_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
         run: scripts/release.sh "${{ steps.ver.outputs.next }}"
 
       - name: Compute DMG sha256
