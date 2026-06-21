@@ -140,6 +140,7 @@ struct PaletteView: View {
             in: RoundedRectangle(cornerRadius: 6)
         )
         .contentShape(Rectangle())
+        .onHover { if $0 { selection = index } }   // mousing over a clip selects it, mirroring ↑↓
         .onTapGesture { selection = index; pasteSelected() }
     }
 
@@ -205,6 +206,7 @@ struct PaletteView: View {
             in: RoundedRectangle(cornerRadius: 6)
         )
         .contentShape(Rectangle())
+        .onHover { if $0 { transformSelection = index } }
         .onTapGesture { transformSelection = index; applyTransform(t) }
     }
 
