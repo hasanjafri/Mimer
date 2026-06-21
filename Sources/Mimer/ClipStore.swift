@@ -31,8 +31,12 @@ final class ClipStore: ObservableObject {
     }
 
     func loadInitial() {
-        if migrateToEncryptedIfNeeded() {
-            persistence.vacuum()   // scrub the now-freed pre-encryption plaintext
+        migrateToEncryptedIfNeeded()
+        // Vacuum if a migration just ran OR a prior launch encrypted rows but crashed
+        // before scrubbing (the pending marker survives that). Clear only after success.
+        if persistence.vacuumPending {
+            persistence.vacuum()
+            persistence.vacuumPending = false
         }
         refresh()
     }
@@ -49,9 +53,10 @@ final class ClipStore: ObservableObject {
             existing.createdAt = now      // re-copy → move to top
             existing.lastUsedAt = now
         } else {
+            guard let encrypted = cryptor.encrypt(text) else { return }   // fail closed — never store plaintext
             let clip = NSEntityDescription.insertNewObject(forEntityName: "Clip", into: context) as! Clip
             clip.id = UUID()
-            clip.text = cryptor.encrypt(text)
+            clip.text = encrypted
             clip.contentHash = hash
             clip.kind = ClipKind.detect(from: text).rawValue
             clip.createdAt = now
@@ -111,9 +116,10 @@ final class ClipStore: ObservableObject {
         existing.fetchLimit = 1
         if (try? context.fetch(existing))?.first != nil { refresh(); return }
 
+        guard let encrypted = cryptor.encrypt(trimmed) else { return }   // fail closed
         let clip = NSEntityDescription.insertNewObject(forEntityName: "Clip", into: context) as! Clip
         clip.id = UUID()
-        clip.text = cryptor.encrypt(trimmed)
+        clip.text = encrypted
         clip.contentHash = hash
         clip.kind = ClipKind.snippet.rawValue
         clip.createdAt = Date()
@@ -157,13 +163,16 @@ final class ClipStore: ObservableObject {
         }
     }
 
-    private func save() {
-        guard context.hasChanges else { return }
+    @discardableResult
+    private func save() -> Bool {
+        guard context.hasChanges else { return true }
         do {
             try context.save()
+            return true
         } catch {
             NSLog("Mimer ClipStore save failed: \(error.localizedDescription)")
             context.rollback()   // discard the failed change so the context stays consistent
+            return false
         }
     }
 
@@ -195,8 +204,11 @@ final class ClipStore: ObservableObject {
         return rows.compactMap { row in
             guard let id = row["id"] as? UUID,
                   let stored = row["text"] as? String,
-                  let text = cryptor.decrypt(stored),   // nil = unreadable (key lost / corrupt) → skip
                   let createdAt = row["createdAt"] as? Date else { return nil }
+            // Surface (don't silently drop) a row we can't decrypt — the key changed or
+            // the value is corrupt. A visible placeholder signals lost history instead of
+            // making it vanish; the real value can't be recovered without the key.
+            let text = cryptor.decrypt(stored) ?? "⚠️ Unreadable clip — encryption key unavailable"
             let kindRaw = (row["kind"] as? NSNumber)?.int16Value ?? 0
             let isFavorite = (row["isFavorite"] as? NSNumber)?.boolValue ?? false
             return ClipItem(
@@ -214,18 +226,23 @@ final class ClipStore: ObservableObject {
     /// store is fully encrypted this fetches nothing — no flag needed, and the
     /// projection's no-blob-faulting guarantee is preserved on every later launch.
     /// Re-encrypting recomputes `contentHash` as the keyed HMAC from the plaintext.
-    /// Returns true if any rows were rewritten (so the caller can vacuum once).
-    @discardableResult
-    private func migrateToEncryptedIfNeeded() -> Bool {
+    /// Idempotent (the predicate matches only un-prefixed rows). Marks a vacuum pending
+    /// *before* saving so a crash after the save still triggers the scrub next launch;
+    /// only encrypts rows that seal successfully, and only commits via a verified save.
+    private func migrateToEncryptedIfNeeded() {
         let request = Clip.fetch()
         request.predicate = NSPredicate(format: "text != nil AND NOT (text BEGINSWITH %@)", Cryptor.prefix)
-        guard let legacy = try? context.fetch(request), !legacy.isEmpty else { return false }
+        guard let legacy = try? context.fetch(request), !legacy.isEmpty else { return }
+
+        var rewrote = false
         for clip in legacy {
-            guard let plaintext = clip.text else { continue }
-            clip.text = cryptor.encrypt(plaintext)
+            guard let plaintext = clip.text, let encrypted = cryptor.encrypt(plaintext) else { continue }
+            clip.text = encrypted
             clip.contentHash = cryptor.dedupeHash(plaintext)
+            rewrote = true
         }
-        save()
-        return true
+        guard rewrote else { return }
+        persistence.vacuumPending = true   // persisted before the save → survives a crash
+        if !save() { persistence.vacuumPending = false }   // rolled back → nothing to scrub
     }
 }

@@ -7,9 +7,9 @@ final class CryptorTests: XCTestCase {
 
     func testRoundTrips() {
         for s in ["hello", "", "ghp_secret_token_value", "multi\nline\nclip", "🔐 unicode ✓"] {
-            let enc = cryptor.encrypt(s)
+            guard let enc = cryptor.encrypt(s) else { XCTFail("encrypt returned nil for \(s)"); continue }
             XCTAssertTrue(enc.hasPrefix(Cryptor.prefix), "should be marked encrypted")
-            XCTAssertFalse(enc.contains(s.isEmpty ? "enc:v1:NEVER" : s), "plaintext must not appear in ciphertext")
+            if !s.isEmpty { XCTAssertFalse(enc.contains(s), "plaintext must not appear in ciphertext") }
             XCTAssertEqual(cryptor.decrypt(enc), s)
         }
     }
@@ -25,7 +25,7 @@ final class CryptorTests: XCTestCase {
     }
 
     func testWrongKeyOrCorruptReturnsNil() {
-        let enc = cryptor.encrypt("secret")
+        let enc = cryptor.encrypt("secret")!
         let other = Cryptor(key: SymmetricKey(data: Data(repeating: 4, count: 32)))
         XCTAssertNil(other.decrypt(enc), "a different key must not decrypt")
         XCTAssertNil(cryptor.decrypt(Cryptor.prefix + "not-valid-base64!!"), "corrupt payload → nil")
