@@ -52,7 +52,9 @@ struct SearchQuery {
                 else if let ks = kindMap[v] { q.kinds = (q.kinds ?? []).union(ks); usedOperator = true }
                 else { textTokens.append(t) }   // unknown type: → treat as literal text
             } else if lower.hasPrefix("app:") {
-                let v = String(t.dropFirst("app:".count))   // keep original case for display; matched case-insensitively
+                var v = String(t.dropFirst("app:".count))   // original case; matched case-insensitively
+                if v.hasPrefix("\"") { v.removeFirst() }    // strip stray quotes (e.g. a single-token app:"x")
+                if v.hasSuffix("\"") { v.removeLast() }
                 if v.isEmpty { textTokens.append(t) } else { q.appFilter = v; usedOperator = true }
             } else if lower == "is:fav" || lower == "is:favorite" {
                 q.onlyFavorites = true; usedOperator = true

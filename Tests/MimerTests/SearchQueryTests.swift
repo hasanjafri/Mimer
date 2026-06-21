@@ -24,6 +24,12 @@ final class SearchQueryTests: XCTestCase {
         XCTAssertFalse(q.matches(item("foobar", app: "Xcode")))
     }
 
+    func testAppFilterStripsStrayQuotes() {
+        // A single-token quoted value (or a leaked one) must not keep its quotes.
+        XCTAssertEqual(SearchQuery.parse("app:\"Xcode\"").appFilter, "Xcode")
+        XCTAssertEqual(SearchQuery.parse("app:\"unclosed").appFilter, "unclosed")
+    }
+
     func testAppPlusTextComposes() {
         let q = SearchQuery.parse("app:Terminal git")
         XCTAssertEqual(q.appFilter, "Terminal")
