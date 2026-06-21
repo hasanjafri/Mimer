@@ -123,9 +123,14 @@ struct MenuBarView: View {
     private func row(item: ClipItem) -> some View {
         let isCopied = copiedID == item.id
         let isHovered = hoverID == item.id
+        let masked = SecretDetector.maskedPreview(item.text)   // nil unless it's a secret
         return HStack(spacing: 10) {
-            KindIcon(kind: item.kind, text: item.text).frame(width: 16)
-            Text(item.text).lineLimit(1).truncationMode(.middle)
+            if masked != nil {
+                Image(systemName: "lock.fill").foregroundStyle(.orange).frame(width: 16)
+            } else {
+                KindIcon(kind: item.kind, text: item.text).frame(width: 16)
+            }
+            Text((prefs.maskSecrets ? masked : nil) ?? item.text).lineLimit(1).truncationMode(.middle)
             Spacer(minLength: 8)
             if isCopied {
                 // The full-row green tint already says "copied"; a bare check

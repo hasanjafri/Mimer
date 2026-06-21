@@ -43,7 +43,11 @@ images; concurrency machinery sits just before the image/OCR work that needs it.
    (pure, gated, unit-tested). Next in this bucket: JSON→TypeScript/Go, diff two clips,
    transform chains, apply-and-paste-without-mutating-clipboard, and paste-as-plain.
 2. **Developer-domain awareness** (git-SHA / issue-key / stack-trace `file:line` /
-   secret detection — replaces email detection).
+   secret detection). *In progress.* Shipped: **secret detection** (`SecretDetector`) —
+   detected API keys/tokens/PEM/secret-env are **masked** in the list (not skipped: Mimer
+   is local/no-cloud and devs re-paste secrets, so the full value is stored + pasted, only
+   the display is masked; toggle in Privacy). Next: reveal-on-demand, and git-SHA /
+   issue-key / stack-trace `file:line` detection + "act on" links.
 3. **Scoped/regex search + paste-stack** (`type:`/`app:`/`/regex/`; queue visibly ordered,
    `⏎` never overloaded).
 4. **Encrypt at rest** — owns the **full** at-rest story up front: SQLCipher whole-DB +

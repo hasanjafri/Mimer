@@ -11,6 +11,7 @@ struct PaletteView: View {
     var initialTransformIndex: Int? = nil   // debug hook: open straight into transform mode
 
     @ObservedObject private var store = ClipStore.shared
+    @ObservedObject private var prefs = Preferences.shared
     @State private var query = ""
     @State private var selection = 0
     @FocusState private var searchFocused: Bool
@@ -120,9 +121,14 @@ struct PaletteView: View {
     }
 
     private func resultRow(index: Int, item: ClipItem) -> some View {
-        HStack(spacing: 8) {
-            KindIcon(kind: item.kind, text: item.text)
-            Text(item.text).lineLimit(1).truncationMode(.middle)
+        let masked = SecretDetector.maskedPreview(item.text)   // nil unless it's a secret
+        return HStack(spacing: 8) {
+            if masked != nil {
+                Image(systemName: "lock.fill").foregroundStyle(.orange).frame(width: 15)
+            } else {
+                KindIcon(kind: item.kind, text: item.text)
+            }
+            Text((prefs.maskSecrets ? masked : nil) ?? item.text).lineLimit(1).truncationMode(.middle)
             Spacer(minLength: 0)
             if item.isFavorite {
                 Image(systemName: "star.fill").font(.caption).foregroundStyle(.yellow)
