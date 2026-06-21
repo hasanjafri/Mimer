@@ -98,11 +98,16 @@ Typical loop: edit → `xcodebuild build` → relaunch the Debug app → drive v
   (link/code/color/sha/issue/file/snippet/image), `type:secret`/`is:secret` (live detection,
   works on old clips), `is:fav`, and `/regex/` (case-insensitive; invalid → literal fuzzy) —
   the leftover text stays a fuzzy match. Pure + testable; plain queries behave as before.
+- `PasteStack` — ordered, deduped queue of clip ids (⇥ toggles membership; resolves to live
+  `ClipItem`s at paste time, dropping deleted clips). Pure + testable; resets each palette open.
 - `CommandPalettePanel` (nonactivating `NSPanel`, `canBecomeKey`) + `PaletteView` — the
   palette: search (+ `SearchQuery` filters) + ⌘K transform mode (search field stays mounted to keep focus).
-  Keys: **⇧⌘V** toggle · ↑↓ · ⏎ paste · ⌘1-9 quick · ⌘K transform · **⌘O** act
-  (context-aware, see `ClipAction`) · ⌘D favorite · **⌘⌫** delete · esc. The footer shows
-  the ⌘O verb for the selected clip; revealed secrets re-mask when the palette closes.
+  Keys: **⇧⌘V** toggle · ↑↓ · ⏎ paste · **⇥** stack · **⇧⏎** paste stack · ⌘1-9 quick ·
+  ⌘K transform · **⌘O** act (context-aware, see `ClipAction`) · ⌘D favorite · **⌘⌫** delete · esc.
+  The footer shows the ⌘O verb for the selected clip; revealed secrets re-mask when the palette
+  closes. ⇥ builds a visible `PasteStack` (numbered badges); ⇧⏎ pastes it in order via
+  `dismiss(pasteSequence:)` (each clip pasted with a gap). All key handling routes through
+  `handleKey` (a single `.onKeyPress(phases:.down)`) so ⏎/⇧⏎/⇥ never collide.
 - `MenuBarView` / `MenuBarLabel` — dropdown + the capture pulse (icon bounce + checkmark)
   and paused dimming.
 - `Onboarding*`, `Settings*` (General / Privacy / About), `SnippetComposer*`,
@@ -155,6 +160,7 @@ filters as hygiene; defer OCR. Full sequenced plan + risks + design invariants i
 Shipped since 0.2.1 (unreleased on `main`): **secret detection + masking** (`SecretDetector`),
 **encrypt history at rest** (`Cryptor`, AES-GCM + Keychain key, lazy migration + vacuum), and
 **developer-domain awareness** (type detection + ⌘O config-free act-on via `ClipAction`), and
-**scoped/regex search** (`SearchQuery` — `type:`/`is:`/`/regex/`). Next in flight: paste-stack
-and `app:` scoping, plus the configurable act-on integrations (open commit/issue/editor,
-Settings → Developer).
+**scoped/regex search** (`SearchQuery` — `type:`/`is:`/`/regex/`) and **paste-stack**
+(`PasteStack` — ⇥ queue, ⇧⏎ paste in order). Next in flight: `app:` scoping (source-app
+capture), the configurable act-on integrations (open commit/issue/editor, Settings →
+Developer), and more transforms.

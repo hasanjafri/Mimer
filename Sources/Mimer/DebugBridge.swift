@@ -69,6 +69,9 @@ final class DebugBridge {
             if parts.count > 1, let index = Int(parts[1]) {
                 PaletteController.shared.open(transformIndex: index)
             }
+        case "stack":   // e.g. "stack 0 2 4" — open the palette with those clips pre-stacked
+            let idxs = (parts.count > 1 ? parts[1] : "").split(separator: " ").compactMap { Int($0) }
+            PaletteController.shared.open(stackIndices: idxs.isEmpty ? nil : idxs)
         case "snippet":
             if parts.count > 1 { ClipStore.shared.addSnippet(parts[1]) }
         case "composer": SnippetComposerWindowController.shared.show()

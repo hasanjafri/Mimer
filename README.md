@@ -36,6 +36,7 @@ one-keystroke transforms — all local-first, no subscription, MIT-licensed.
 - **Command palette (⇧⌘V)** — fuzzy search, ↑↓ to move, ⏎ to paste back into the app you were in.
 - **Scoped search** — filter as you type: `type:link` (or `code`/`color`/`sha`/`issue`/`file`/`snippet`), `type:secret`, `is:fav`, and `/regex/` — combine with text, e.g. `type:link react`.
 - **Quick-paste (⌘1–⌘9)** — grab one of the top results instantly.
+- **Paste-stack** — press **⇥** to queue several clips (numbered in order), then **⇧⏎** to paste them all in sequence — great for filling forms or assembling something from parts.
 - **Type-aware clips** — links, code, colors, **git SHAs, issue keys (`ABC-123`), and file paths / stack-trace `file:line`** each get their own glyph; hex colors show a live swatch.
 - **⌘O — act on a clip** — context-aware, no setup: reveal a masked secret, open a link in your browser, or reveal a file path / `file:line` in Finder. (Opening commits/issues/editors lands in a later release.)
 - **⌘K transforms** — for the selected clip, each with a live preview and shown only when it applies:
@@ -48,7 +49,7 @@ one-keystroke transforms — all local-first, no subscription, MIT-licensed.
 - **Auto-paste (optional)** — ⏎ pastes straight into your previous app once you grant the one permission; otherwise the clip is on your clipboard for ⌘V.
 - **Launch at login**, configurable history size, and a configurable menu height.
 
-Planned: rich types (images/files), paste-stack, more transforms.
+Planned: rich types (images/files), more transforms.
 
 ## Keyboard
 
