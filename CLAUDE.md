@@ -95,10 +95,11 @@ Typical loop: edit → `xcodebuild build` → relaunch the Debug app → drive v
   on purpose, so the full value is stored + pasted; only the display is masked. Toggle:
   `Preferences.maskSecrets` (default on), Privacy settings.
 - `ClipTransform` — ⌘K transforms (pure `String -> String?`, nil = hidden). Generic:
-  UPPER/lower/Title, trim, slugify, base64, url, json. Developer (gated, only shown when
-  they apply): Decode JWT, Strip tracking params, Decode query string, Unix↔ISO 8601.
-  `applicable(to:)` hides no-ops/inapplicable. This is the wedge — extend here per
-  `docs/ROADMAP.md` (JSON→type, diff two clips, chains, paste-as-plain next).
+  UPPER/lower/Title, trim, slugify, base64, url, json, **camelCase/snake_case** (identifier-
+  phrase-gated). Structure: **JSON → TypeScript** (`interface Root`), **sort/dedupe/reverse
+  lines** (multi-line-gated). Developer (gated): Decode JWT, Strip tracking params, Decode
+  query string, Unix↔ISO 8601. `applicable(to:)` hides no-ops/inapplicable. This is the wedge
+  — extend here per `docs/ROADMAP.md` (diff two clips, chains, paste-as-plain next).
 - `SearchQuery` — parses the palette search box into composable filters: `type:<kind>`
   (link/code/color/sha/issue/file/snippet/image), `type:secret`/`is:secret` (live detection,
   works on old clips), `is:fav`, `app:<name>` (case-insensitive substring of the capturing

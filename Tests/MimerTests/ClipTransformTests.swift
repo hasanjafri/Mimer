@@ -83,4 +83,55 @@ final class ClipTransformTests: XCTestCase {
         XCTAssertEqual(transform("iso2epoch").apply("2018-01-18T01:30:22.123Z"), "1516239022")  // fractional seconds
         XCTAssertNil(transform("iso2epoch").apply("not a date"))
     }
+
+    func testJSONToTypeScript() {
+        let out = transform("json2ts").apply("{\"name\":\"Bob\",\"age\":30,\"admin\":true,\"tags\":[\"a\"],\"meta\":{\"x\":1}}")
+        XCTAssertNotNil(out)
+        XCTAssertTrue(out!.hasPrefix("interface Root {"))
+        XCTAssertTrue(out!.contains("name: string;"))
+        XCTAssertTrue(out!.contains("age: number;"))
+        XCTAssertTrue(out!.contains("admin: boolean;"))   // bool not number
+        XCTAssertTrue(out!.contains("tags: string[];"))
+        XCTAssertTrue(out!.contains("meta: {"))           // nested object inlined
+        XCTAssertNil(transform("json2ts").apply("[1,2,3]"))        // top-level array → not an interface
+        XCTAssertNil(transform("json2ts").apply("just prose"))
+    }
+
+    func testJSONToTypeScriptEdgeCases() {
+        // Heterogeneous array → union, not just the first element's type.
+        XCTAssertTrue(transform("json2ts").apply("{\"x\":[1,\"a\"]}")!.contains("x: (number | string)[];"))
+        XCTAssertTrue(transform("json2ts").apply("{\"x\":[]}")!.contains("x: any[];"))
+        // Non-identifier key is escaped, not emitted raw.
+        let escaped = transform("json2ts").apply("{\"a\\\"b\":1}")!
+        XCTAssertTrue(escaped.contains("\"a\\\"b\": number;"))
+        XCTAssertFalse(escaped.contains("\"a\"b\""))   // not the broken/unescaped form
+        // A key with a newline/control char stays a single valid TS string literal (no raw newline).
+        let nl = transform("json2ts").apply("{\"a\\nb\":1}")!
+        XCTAssertTrue(nl.contains("\"a\\nb\": number;"))
+        XCTAssertFalse(nl.contains("\"a\nb\""))        // not split across physical lines
+    }
+
+    func testLineOps() {
+        XCTAssertEqual(transform("sortlines").apply("banana\napple\ncherry"), "apple\nbanana\ncherry")
+        XCTAssertEqual(transform("dedupelines").apply("a\nb\na\nc\nb"), "a\nb\nc")
+        XCTAssertEqual(transform("reverselines").apply("1\n2\n3"), "3\n2\n1")
+        XCTAssertNil(transform("sortlines").apply("single line"))           // single line → hidden
+        XCTAssertNil(transform("reverselines").apply("single line"))
+        XCTAssertNil(transform("sortlines").apply("single line\n"))         // trailing newline ≠ a second line
+        XCTAssertEqual(transform("sortlines").apply("b\na\n"), "a\nb\n")    // trailing newline preserved
+        // dedupe with no duplicates is hidden by applicable() (output == input)
+        XCTAssertFalse(ClipTransform.applicable(to: "a\nb\nc").contains { $0.id == "dedupelines" })
+        XCTAssertTrue(ClipTransform.applicable(to: "a\nb\na").contains { $0.id == "dedupelines" })
+    }
+
+    func testCaseConversions() {
+        XCTAssertEqual(transform("camel").apply("user name"), "userName")
+        XCTAssertEqual(transform("camel").apply("user_profile_id"), "userProfileId")
+        XCTAssertEqual(transform("snake").apply("userName"), "user_name")          // camelCase boundary split
+        XCTAssertEqual(transform("snake").apply("User Profile ID"), "user_profile_id")
+        XCTAssertEqual(transform("snake").apply("parseURLValue"), "parse_url_value")  // acronym boundary
+        XCTAssertNil(transform("camel").apply("This is just prose"))                // 4-word prose, no signal → hidden
+        XCTAssertNil(transform("camel").apply("a full sentence, with punctuation.")) // punctuation → hidden
+        XCTAssertNil(transform("snake").apply("multi\nline"))                       // not a single identifier-ish line
+    }
 }
