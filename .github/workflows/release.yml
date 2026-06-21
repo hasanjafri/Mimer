@@ -174,8 +174,10 @@ jobs:
         if: ${{ !inputs.dry_run }}
         run: |
           set -euo pipefail
+          # Only the marketing version is tracked in project.yml. The build number
+          # (CURRENT_PROJECT_VERSION / CFBundleVersion) is set at build time by
+          # release.sh from the git commit count — a monotonic integer.
           sed -i '' -E 's/(MARKETING_VERSION: )"[0-9]+\.[0-9]+\.[0-9]+"/\1"${{ steps.ver.outputs.next }}"/' project.yml
-          sed -i '' -E 's/(CURRENT_PROJECT_VERSION: )"[^"]*"/\1"${{ steps.ver.outputs.next }}"/' project.yml
 
       - name: Commit version bump + signed appcast to main
         if: ${{ !inputs.dry_run }}

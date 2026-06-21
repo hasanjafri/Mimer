@@ -19,6 +19,10 @@ VERSION="${1:?usage: scripts/release.sh <version>}"
 NOTARY_PROFILE="${NOTARY_PROFILE:-mimer-notary}"
 SCHEME="Mimer"
 DIR="$(cd "$(dirname "$0")/.." && pwd)"
+# CFBundleVersion (the build number) must be a monotonically increasing integer:
+# Sparkle compares it to decide if an update is newer, and "0.2.0" sorts BELOW an
+# earlier integer build like "1". Use the git commit count (override: BUILD_NUMBER).
+BUILD_NO="${BUILD_NUMBER:-$(git -C "$DIR" rev-list --count HEAD)}"
 BUILD="$DIR/build"
 APP="$BUILD/export/Mimer.app"
 DMG="$BUILD/Mimer-$VERSION.dmg"
@@ -39,10 +43,10 @@ echo "▸ Signing as: $IDENTITY  (team $TEAM_ID)"
 rm -rf "$BUILD"; mkdir -p "$BUILD"
 xcodegen generate --spec "$DIR/project.yml"
 
-echo "▸ Archiving…"
+echo "▸ Archiving $VERSION (build $BUILD_NO)…"
 xcodebuild -project "$DIR/Mimer.xcodeproj" -scheme "$SCHEME" -configuration Release \
   -archivePath "$BUILD/Mimer.xcarchive" \
-  MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="$VERSION" \
+  MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="$BUILD_NO" \
   CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="Developer ID Application" DEVELOPMENT_TEAM="$TEAM_ID" \
   archive
 
@@ -94,10 +98,11 @@ if [ -n "${SPARKLE_ED_KEY:-}" ]; then
 else
   "$GENAPPCAST" --download-url-prefix "$PREFIX" "$BUILD/appcast-src" -o "$DIR/appcast.xml"
 fi
-# Verify this version actually made it into the signed feed (-F: dots in the
-# version are literal, not regex wildcards).
-if ! grep -qF "<sparkle:version>$VERSION</sparkle:version>" "$DIR/appcast.xml"; then
-  echo "✗ appcast.xml does not contain version $VERSION after generation"
+# Verify this release made it into the signed feed. Check the shortVersionString
+# (the marketing version) — sparkle:version now carries the integer build number.
+# -F: dots are literal, not regex wildcards.
+if ! grep -qF "<sparkle:shortVersionString>$VERSION</sparkle:shortVersionString>" "$DIR/appcast.xml"; then
+  echo "✗ appcast.xml does not contain $VERSION (shortVersionString) after generation"
   exit 1
 fi
 echo "▸ appcast.xml updated + signed — commit + push it after creating the GitHub release"
