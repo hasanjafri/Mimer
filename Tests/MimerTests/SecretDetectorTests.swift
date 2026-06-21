@@ -19,6 +19,8 @@ final class SecretDetectorTests: XCTestCase {
         XCTAssertEqual(SecretDetector.kind(of: github), "GitHub token")
         XCTAssertEqual(SecretDetector.kind(of: slack), "Slack token")
         XCTAssertEqual(SecretDetector.kind(of: google), "Google API key")
+        // Stripe `sk_live_…` (underscore) is labeled Stripe, not shadowed by OpenAI `sk-` (hyphen).
+        XCTAssertEqual(SecretDetector.kind(of: "sk_live_" + String(repeating: "e", count: 24)), "Stripe key")
         XCTAssertEqual(SecretDetector.kind(of: pem), "Private key")
         XCTAssertEqual(SecretDetector.kind(of: envSecret), "Secret")
         XCTAssertEqual(SecretDetector.kind(of: "API_" + "TOKEN=abcdef123456"), "Secret")
