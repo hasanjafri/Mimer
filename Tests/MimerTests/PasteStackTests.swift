@@ -33,6 +33,18 @@ final class PasteStackTests: XCTestCase {
         XCTAssertTrue(ghost.isEmpty)
     }
 
+    func testRemoveKeepsCountAccurate() {
+        let a = item("a"), b = item("b"), c = item("c")
+        var s = PasteStack()
+        s.toggle(a.id); s.toggle(b.id); s.toggle(c.id)
+        s.remove(b.id)                       // e.g. b's clip was deleted
+        XCTAssertEqual(s.count, 2)
+        XCTAssertNil(s.position(of: b.id))
+        XCTAssertEqual(s.position(of: c.id), 2)
+        s.remove(b.id)                       // removing a non-member is a no-op
+        XCTAssertEqual(s.count, 2)
+    }
+
     func testClearAndEmpty() {
         let a = item("a")
         var s = PasteStack()

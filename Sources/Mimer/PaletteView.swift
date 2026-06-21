@@ -341,18 +341,14 @@ struct PaletteView: View {
         stack.toggle(results[selection].id)
     }
 
-    private func pasteStack() {
-        let texts = stack.ordered(from: store.snippets + store.items).map(\.text)
-        guard !texts.isEmpty else { return }
-        onPasteSequence(texts)
-    }
-
     private func handleKey(_ press: KeyPress) -> KeyPress.Result {
         switch press.key {
         case .return:
-            // ⇧⏎ pastes the stack (when one exists); ⏎ stays single-paste — never overloaded.
-            if transformTarget == nil, press.modifiers.contains(.shift), !stack.isEmpty {
-                pasteStack()
+            // ⇧⏎ pastes the stack (resolved to live clips); ⏎ stays single-paste — never
+            // overloaded. Falls back to single-paste if the stack resolves to nothing.
+            let stackTexts = stack.ordered(from: store.snippets + store.items).map(\.text)
+            if transformTarget == nil, press.modifiers.contains(.shift), !stackTexts.isEmpty {
+                onPasteSequence(stackTexts)
             } else {
                 commitSelection()
             }
@@ -417,7 +413,9 @@ struct PaletteView: View {
 
     private func deleteSelected() {
         guard results.indices.contains(selection) else { return }
-        store.delete(results[selection].id)
+        let id = results[selection].id
+        stack.remove(id)        // keep the stack count/badges accurate
+        store.delete(id)
     }
 
     /// The context-aware action (⌘O) for the selected clip, or nil. Computed live from text.

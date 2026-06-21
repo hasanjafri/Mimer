@@ -51,7 +51,7 @@ final class PaletteController: NSObject {
     }
 
     func open(transformIndex: Int? = nil, stackIndices: [Int]? = nil) {
-        guard !isPaletteVisible else { return }
+        guard !isPaletteVisible, !isDismissing else { return }   // don't reopen mid-paste-sequence
         previousApp = NSWorkspace.shared.frontmostApplication
         let panel = makePanel(transformIndex: transformIndex, stackIndices: stackIndices)   // fresh each open → field re-focuses + clean search
         self.panel = panel
@@ -109,22 +109,33 @@ final class PaletteController: NSObject {
         panel?.orderOut(nil)
         panel = nil
 
-        if previousApp?.isTerminated == false { previousApp?.activate() }
+        let target = previousApp
+        if target?.isTerminated == false { target?.activate() }
         guard Paster.canPostEvents else {
-            _ = Paster.copyToPasteboard(items[items.count - 1])   // best effort: leave the last on the clipboard
+            // Can't auto-paste → assemble the whole stack on the clipboard (deterministic, all
+            // items) for a manual ⌘V, rather than silently pasting an arbitrary one.
+            _ = Paster.copyToPasteboard(items.joined(separator: "\n"))
             isDismissing = false
             return
         }
-        pasteNext(items, index: 0, initialDelay: 0.12)   // let the prior app focus first
+        pasteNext(items, index: 0, target: target, initialDelay: 0.12)   // let the prior app focus first
     }
 
-    private func pasteNext(_ items: [String], index: Int, initialDelay: TimeInterval = 0) {
+    private func pasteNext(_ items: [String], index: Int, target: NSRunningApplication?, initialDelay: TimeInterval = 0) {
         guard index < items.count else { isDismissing = false; return }
         _ = Paster.copyToPasteboard(items[index])
         DispatchQueue.main.asyncAfter(deadline: .now() + initialDelay) { [weak self] in
+            guard let self else { return }
+            // Abort if the intended app went away or is no longer frontmost — never paste the
+            // rest of the stack into whatever happens to be up front now.
+            if let target, target.isTerminated ||
+                NSWorkspace.shared.frontmostApplication?.processIdentifier != target.processIdentifier {
+                self.isDismissing = false
+                return
+            }
             _ = Paster.synthesizePaste()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {   // gap so the app processes each paste
-                self?.pasteNext(items, index: index + 1)
+                self.pasteNext(items, index: index + 1, target: target)
             }
         }
     }

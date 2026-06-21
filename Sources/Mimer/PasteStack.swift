@@ -16,6 +16,9 @@ struct PasteStack {
 
     mutating func clear() { ids.removeAll() }
 
+    /// Drop an id (e.g. when its clip is deleted) so the count/badges stay accurate.
+    mutating func remove(_ id: UUID) { ids.removeAll { $0 == id } }
+
     /// 1-based position shown as the row badge, or nil if not stacked.
     func position(of id: UUID) -> Int? { ids.firstIndex(of: id).map { $0 + 1 } }
 
