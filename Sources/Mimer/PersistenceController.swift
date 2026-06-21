@@ -21,17 +21,29 @@ final class PersistenceController {
     private var vacuumMarkerURL: URL? { storeFileURL?.appendingPathExtension("vacuum-pending") }
 
     var vacuumPending: Bool {
-        get { vacuumMarkerURL.map { FileManager.default.fileExists(atPath: $0.path) } ?? false }
-        set {
-            guard let url = vacuumMarkerURL else { return }
-            if newValue {
-                let fd = open(url.path, O_WRONLY | O_CREAT | O_TRUNC, 0o600)
-                if fd >= 0 { _ = fsync(fd); close(fd) }   // durable + ordered before the save
-                else { NSLog("Mimer: could not write vacuum marker at \(url.path)") }
-            } else {
-                try? FileManager.default.removeItem(at: url)
-            }
-        }
+        vacuumMarkerURL.map { FileManager.default.fileExists(atPath: $0.path) } ?? false
+    }
+
+    /// Durably create the marker — fsync the file *and* its parent directory so the new
+    /// entry survives a crash — and report success. The migration must only commit the
+    /// encrypting save if this returns true; otherwise there'd be ciphertext on disk with
+    /// no record that the freed plaintext still needs scrubbing. In-memory stores have
+    /// nothing to persist (and vacuum is a no-op), so they return true.
+    @discardableResult
+    func setVacuumPending() -> Bool {
+        guard let url = vacuumMarkerURL else { return true }
+        let fd = open(url.path, O_WRONLY | O_CREAT | O_TRUNC, 0o600)
+        guard fd >= 0 else { NSLog("Mimer: could not create vacuum marker at \(url.path)"); return false }
+        let fileSynced = fsync(fd) == 0
+        close(fd)
+        guard fileSynced else { NSLog("Mimer: could not fsync vacuum marker"); return false }
+        let dirFd = open(url.deletingLastPathComponent().path, O_RDONLY)
+        if dirFd >= 0 { _ = fsync(dirFd); close(dirFd) }   // make the new dir entry durable too
+        return true
+    }
+
+    func clearVacuumPending() {
+        vacuumMarkerURL.map { try? FileManager.default.removeItem(at: $0) }
     }
 
     init(inMemory: Bool = false, storeURL: URL? = nil) {

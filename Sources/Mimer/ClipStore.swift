@@ -36,7 +36,7 @@ final class ClipStore: ObservableObject {
         // before scrubbing (the pending marker survives that). Clear the marker only on a
         // confirmed scrub — otherwise leave it set so a failed vacuum retries next launch.
         if persistence.vacuumPending, persistence.vacuum() {
-            persistence.vacuumPending = false
+            persistence.clearVacuumPending()
         }
         refresh()
     }
@@ -245,11 +245,16 @@ final class ClipStore: ObservableObject {
             rewrote = true
         }
         guard rewrote else { return }
-        // Mark a scrub pending BEFORE saving so a crash after the commit still vacuums next
-        // launch. Never clear it here: a failed save just rolls the rows back to plaintext
-        // (retried next launch), and clearing could wipe a *prior* launch's unscrubbed debt.
-        // The marker is cleared only by a confirmed vacuum in loadInitial().
-        persistence.vacuumPending = true
+        // Persist the scrub marker (durably) BEFORE committing the encrypting save. If the
+        // marker can't be written, roll back rather than commit ciphertext with no record
+        // that the freed plaintext still needs scrubbing — we'll retry the whole migration
+        // next launch. The marker is never cleared here (only a confirmed vacuum clears it),
+        // so a save failure or a prior launch's unscrubbed debt is preserved.
+        guard persistence.setVacuumPending() else {
+            NSLog("Mimer: deferring encryption migration — vacuum marker not persistable")
+            context.rollback()
+            return
+        }
         save()
     }
 }
