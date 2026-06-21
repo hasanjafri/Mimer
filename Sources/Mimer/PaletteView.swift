@@ -27,10 +27,12 @@ struct PaletteView: View {
     // resets to empty every time — revealed secrets re-mask once the palette closes.
     @State private var revealedSecrets: Set<UUID> = []
 
+    // Parsed once per query change (not per results access) so a /regex/ compiles only once.
+    @State private var parsedQuery = SearchQuery()
+
     private var results: [ClipItem] {
-        let q = SearchQuery.parse(query)
-        if q.isEmpty { return store.snippets + store.items }
-        return store.snippets.filter(q.matches) + store.items.filter(q.matches)
+        if parsedQuery.isEmpty { return store.snippets + store.items }
+        return store.snippets.filter(parsedQuery.matches) + store.items.filter(parsedQuery.matches)
     }
 
     private var transforms: [ClipTransform] {
@@ -83,7 +85,10 @@ struct PaletteView: View {
             }
             DispatchQueue.main.async { searchFocused = true }
         }
-        .onChange(of: query) { if transformTarget != nil { transformSelection = 0 } else { selection = 0 } }
+        .onChange(of: query) {
+            parsedQuery = SearchQuery.parse(query)
+            if transformTarget != nil { transformSelection = 0 } else { selection = 0 }
+        }
         .onChange(of: results.count) { if selection >= results.count { selection = max(0, results.count - 1) } }
         .onChange(of: transformTarget?.id) { DispatchQueue.main.async { searchFocused = true } }   // keep keys alive across modes
         .onKeyPress(.downArrow) { moveSelection(1); return .handled }

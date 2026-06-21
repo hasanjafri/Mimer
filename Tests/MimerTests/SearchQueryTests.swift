@@ -62,6 +62,25 @@ final class SearchQueryTests: XCTestCase {
         XCTAssertTrue(q.matches(item("an /[unclosed/ token")))
     }
 
+    func testTypeMatchesLiveDetectedKindOnOldClips() {
+        // A clip stored as .text (pre-detection) whose text IS a link still matches type:link.
+        let q = SearchQuery.parse("type:link")
+        XCTAssertTrue(q.matches(item("https://example.com", kind: .text)))
+        XCTAssertFalse(q.matches(item("not a link", kind: .text)))
+    }
+
+    func testPlainQueryPreservesRawSpacing() {
+        XCTAssertEqual(SearchQuery.parse("foo  bar").text, "foo  bar")   // no whitespace collapse
+        XCTAssertEqual(SearchQuery.parse(" foo").text, " foo")
+    }
+
+    func testOverlongRegexFallsBackToLiteral() {
+        let long = "/" + String(repeating: "a", count: 200) + "/"
+        let q = SearchQuery.parse(long)
+        XCTAssertNil(q.regex)              // too long → not compiled
+        XCTAssertEqual(q.text, long)       // treated literally
+    }
+
     func testUnknownTypeIsLiteralText() {
         let q = SearchQuery.parse("type:bogus")
         XCTAssertNil(q.kinds)
