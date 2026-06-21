@@ -22,6 +22,8 @@ final class SecretDetectorTests: XCTestCase {
         XCTAssertEqual(SecretDetector.kind(of: pem), "Private key")
         XCTAssertEqual(SecretDetector.kind(of: envSecret), "Secret")
         XCTAssertEqual(SecretDetector.kind(of: "API_" + "TOKEN=abcdef123456"), "Secret")
+        XCTAssertEqual(SecretDetector.kind(of: "api_" + "key=abcdef123456"), "Secret")   // lowercase dotenv
+        XCTAssertEqual(SecretDetector.kind(of: "password=hunter2hunter"), "Secret")
     }
 
     func testIgnoresOrdinaryClips() {
@@ -31,6 +33,7 @@ final class SecretDetectorTests: XCTestCase {
         XCTAssertNil(SecretDetector.kind(of: "this is my secret recipe"))   // prose with "secret"
         XCTAssertNil(SecretDetector.kind(of: "sk-1"))                       // too short to be a key
         XCTAssertNil(SecretDetector.kind(of: "PORT=8080"))                  // not a secret-named var
+        XCTAssertNil(SecretDetector.kind(of: "monkey=banana123456"))        // "key" is a substring, not a component
         XCTAssertNil(SecretDetector.kind(of: "SECRET_SANTA=bob"))           // value too short
         XCTAssertNil(SecretDetector.kind(of: "eyJhbGciOiJIUzI1NiJ9.e30.x")) // JWT — decoded, not masked
     }

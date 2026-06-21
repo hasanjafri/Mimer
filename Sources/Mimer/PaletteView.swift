@@ -167,7 +167,8 @@ struct PaletteView: View {
         HStack(spacing: 6) {
             Image(systemName: "wand.and.stars").foregroundStyle(.purple)
             Text("Transform").foregroundStyle(.secondary)
-            Text(target.text).lineLimit(1).truncationMode(.middle)
+            Text((prefs.maskSecrets ? SecretDetector.maskedPreview(target.text) : nil) ?? target.text)
+                .lineLimit(1).truncationMode(.middle)
             Spacer(minLength: 8)
             Text("esc to go back").foregroundStyle(.tertiary)
         }
@@ -194,11 +195,15 @@ struct PaletteView: View {
     }
 
     private func transformRow(index: Int, t: ClipTransform) -> some View {
-        HStack(spacing: 8) {
+        // Don't preview a transformed secret — the result can expose it in another
+        // encoding/case. The transform still applies to the real value on tap.
+        let hideSecret = prefs.maskSecrets && transformTarget.map { SecretDetector.isSecret($0.text) } == true
+        let preview = hideSecret ? "••••" : (transformTarget.flatMap { t.apply($0.text) } ?? "")
+        return HStack(spacing: 8) {
             Image(systemName: t.systemImage).foregroundStyle(.purple).frame(width: 16)
             Text(t.name)
             Spacer(minLength: 12)
-            Text((transformTarget.flatMap { t.apply($0.text) }) ?? "")
+            Text(preview)
                 .lineLimit(1).truncationMode(.middle)
                 .font(.caption.monospaced())
                 .foregroundStyle(.tertiary)

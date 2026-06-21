@@ -62,12 +62,13 @@ enum SecretDetector {
         PrefixRule(prefix: "ya29.", minLength: 20, label: "OAuth token")
     ]
 
-    /// `NAME=value` (optionally `export `-prefixed) where NAME contains a secret word and
-    /// the value is non-trivial. Case-sensitive on the name (env vars are UPPER_SNAKE).
+    /// `NAME=value` (optionally `export `-prefixed) where NAME has a secret-word
+    /// *component* (underscore-bounded) and the value is non-trivial. Case-insensitive,
+    /// so `api_key=…` and `PASSWORD=…` match while `monkey=…` / `PORT=…` don't.
     private static func envAssignmentLabel(_ t: String) -> String? {
         // Single line only — don't match multi-line blobs.
         guard !t.contains("\n") else { return nil }
-        let pattern = #"^(export\s+)?[A-Z][A-Z0-9_]*(KEY|TOKEN|SECRET|PASSWORD|PASSWD|PWD)[A-Z0-9_]*\s*=\s*['"]?\S{6,}"#
-        return t.range(of: pattern, options: .regularExpression) != nil ? "Secret" : nil
+        let pattern = #"^(export\s+)?([A-Za-z0-9]+_)*(key|token|secret|password|passwd|pwd|apikey)(_[A-Za-z0-9]+)*\s*=\s*['"]?\S{6,}"#
+        return t.range(of: pattern, options: [.regularExpression, .caseInsensitive]) != nil ? "Secret" : nil
     }
 }
