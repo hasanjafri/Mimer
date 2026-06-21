@@ -33,9 +33,9 @@ final class ClipStore: ObservableObject {
     func loadInitial() {
         migrateToEncryptedIfNeeded()
         // Vacuum if a migration just ran OR a prior launch encrypted rows but crashed
-        // before scrubbing (the pending marker survives that). Clear only after success.
-        if persistence.vacuumPending {
-            persistence.vacuum()
+        // before scrubbing (the pending marker survives that). Clear the marker only on a
+        // confirmed scrub — otherwise leave it set so a failed vacuum retries next launch.
+        if persistence.vacuumPending, persistence.vacuum() {
             persistence.vacuumPending = false
         }
         refresh()

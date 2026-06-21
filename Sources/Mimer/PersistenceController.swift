@@ -54,10 +54,14 @@ final class PersistenceController {
     /// database from scratch, so free pages — which can still hold pre-encryption
     /// plaintext even after the rows were re-encrypted — are dropped. Called once,
     /// right after the encryption migration actually rewrites legacy rows.
-    func vacuum() {
+    /// Returns true **only** if the VACUUM actually completed — so the caller clears the
+    /// crash-safe scrub marker only on a confirmed scrub. On any failure the store is left
+    /// (or put back) usable and we return false, leaving the marker set to retry next launch.
+    @discardableResult
+    func vacuum() -> Bool {
         let coordinator = container.persistentStoreCoordinator
         guard let store = coordinator.persistentStores.first,
-              let url = store.url, url.path != "/dev/null" else { return }
+              let url = store.url, url.path != "/dev/null" else { return false }
         let originalOptions = store.options   // to restore the store if the vacuum re-add fails
 
         // Drop registered objects before swapping the store out from under the context.
@@ -66,7 +70,7 @@ final class PersistenceController {
             try coordinator.remove(store)
         } catch {
             NSLog("Mimer vacuum: store remove failed (\(error.localizedDescription)); store left intact")
-            return
+            return false
         }
         do {
             try coordinator.addPersistentStore(
@@ -75,11 +79,17 @@ final class PersistenceController {
                           NSSQLitePragmasOption: ["secure_delete": "ON"],
                           NSMigratePersistentStoresAutomaticallyOption: true,
                           NSInferMappingModelAutomaticallyOption: true])
+            return true
         } catch {
-            // Never leave the coordinator store-less: re-add the original store so fetches work.
+            // VACUUM re-add failed — put the original store back so the app isn't store-less.
             NSLog("Mimer vacuum: re-add with VACUUM failed (\(error.localizedDescription)); restoring store")
-            _ = try? coordinator.addPersistentStore(
-                ofType: NSSQLiteStoreType, configurationName: nil, at: url, options: originalOptions)
+            do {
+                try coordinator.addPersistentStore(
+                    ofType: NSSQLiteStoreType, configurationName: nil, at: url, options: originalOptions)
+            } catch {
+                NSLog("Mimer vacuum: CRITICAL — could not restore the store (\(error.localizedDescription)); persistence is offline until relaunch")
+            }
+            return false   // scrub did not happen → keep the marker, retry next launch
         }
     }
 
