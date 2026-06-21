@@ -53,17 +53,29 @@ JSON
 
 What a real run does, end to end:
 
-1. Recreates the signing keychain from secrets, then runs `scripts/release.sh <version>`
-   unchanged (archive → Developer ID sign → notarize → staple → DMG → sign the Sparkle
-   `appcast.xml`).
-2. Bumps `MARKETING_VERSION` + `CURRENT_PROJECT_VERSION` in `project.yml`.
-3. Commits the bump + signed `appcast.xml` to `main` and tags `vX.Y.Z`
-   (pushed as you via `RELEASE_TOKEN`, which is why it's allowed past branch protection).
-4. Creates the **GitHub Release** with the DMG attached.
+1. Recreates the signing keychain from secrets, **runs the test suite**, then runs
+   `scripts/release.sh <version>` unchanged (archive → Developer ID sign → notarize →
+   staple → DMG → sign the Sparkle `appcast.xml`).
+2. Creates the **GitHub Release** `vX.Y.Z` with the DMG attached — **first**, so the
+   download URL is live before anything points at it. The tag is placed on the built
+   `main` commit.
+3. Bumps `MARKETING_VERSION` + `CURRENT_PROJECT_VERSION` in `project.yml`.
+4. Commits the bump + signed `appcast.xml` to `main` (pushed as you via `RELEASE_TOKEN`,
+   which is why it's allowed past branch protection — the token is supplied only at push
+   time through an env-reading git credential helper, never written to disk or a command
+   line).
 5. Bumps **`hasanjafri/homebrew-tap`** `Casks/mimer.rb` (version + sha256).
 
 Result: available via `brew upgrade --cask mimer`, the GitHub Releases page, and
 Sparkle in-app auto-update.
+
+Notes:
+- The tag marks the commit that was *built*; the version-bump commit lands right after
+  it. The DMG itself always carries the correct version (passed to `xcodebuild`), and the
+  appcast is only committed once the DMG is live.
+- If a publish step fails partway (e.g. the tap push), the Release/DMG may already exist.
+  Recover by deleting the tag + Release (`gh release delete vX.Y.Z --cleanup-tag`) and
+  re-running, or finish the remaining step by hand.
 
 Only the repository owner can run it (`if: github.actor == github.repository_owner`),
 and triggering `workflow_dispatch` already requires write access — a merged contributor

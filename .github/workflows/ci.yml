@@ -14,12 +14,17 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read   # least privilege — CI only reads the repo
+
 jobs:
   test:
     name: Build & test
     runs-on: macos-15   # Apple Silicon (arch=arm64); default Xcode 16 — XcodeGen emits the v16 project format
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false   # CI never pushes; don't leave a token in .git/config
 
       - name: Show toolchain
         run: xcodebuild -version && swift --version

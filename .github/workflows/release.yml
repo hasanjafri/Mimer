@@ -40,7 +40,7 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: write   # create the GitHub Release + push the version bump and appcast.xml to main
+  contents: write   # GITHUB_TOKEN creates the GitHub Release + tag
 
 jobs:
   release:
@@ -53,7 +53,7 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
-          token: ${{ secrets.RELEASE_TOKEN }}   # push to protected main as the owner
+          persist-credentials: false   # don't leave any token in .git/config during the build
 
       - name: Show toolchain
         run: xcodebuild -version
@@ -111,9 +111,11 @@ jobs:
           done < <(security list-keychains -d user)
           security default-keychain -s "$KC"
           security list-keychains -d user -s "$KC" "${EXISTING[@]}"
-          # Developer ID Application certificate + private key.
+          # Developer ID Application certificate + private key. -T limits key use to
+          # codesign (no broad -A "any app" grant).
           echo "$CERT_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
-          security import "$RUNNER_TEMP/cert.p12" -P "$CERT_PASSWORD" -A -t cert -f pkcs12 -k "$KC"
+          security import "$RUNNER_TEMP/cert.p12" -P "$CERT_PASSWORD" -t cert -f pkcs12 -k "$KC" \
+            -T /usr/bin/codesign
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KC"
           rm -f "$RUNNER_TEMP/cert.p12"
           # notarytool credentials under the keychain profile release.sh expects.
@@ -136,6 +138,12 @@ jobs:
           "$GK" -f "$RUNNER_TEMP/sparkle_key"   # import into the (default) signing keychain
           rm -f "$RUNNER_TEMP/sparkle_key"
 
+      - name: Test (release must pass the suite before it ships)
+        run: |
+          set -o pipefail
+          xcodebuild -project Mimer.xcodeproj -scheme Mimer -configuration Debug \
+            -destination 'platform=macOS,arch=arm64' CODE_SIGNING_ALLOWED=NO test
+
       - name: Build, sign, notarize, package (+ sign appcast)
         run: scripts/release.sh "${{ steps.ver.outputs.next }}"
 
@@ -148,6 +156,21 @@ jobs:
           echo "path=$DMG" >> "$GITHUB_OUTPUT"
           echo "sha256=$(shasum -a 256 "$DMG" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
 
+      # --- Publish (skipped entirely on a dry run) ---------------------------------
+      # Order matters: create the Release (with the DMG) FIRST so the download URL is
+      # live, THEN commit the appcast that points at it. The appcast on main never
+      # references a missing asset.
+
+      - name: Create GitHub Release with the DMG
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh release create "${{ steps.ver.outputs.tag }}" "${{ steps.dmg.outputs.path }}" \
+            --target "$(git rev-parse HEAD)" \
+            --title "Mimer ${{ steps.ver.outputs.next }}" --generate-notes
+
       - name: Bump version in project.yml
         if: ${{ !inputs.dry_run }}
         run: |
@@ -155,33 +178,31 @@ jobs:
           sed -i '' -E 's/(MARKETING_VERSION: )"[0-9]+\.[0-9]+\.[0-9]+"/\1"${{ steps.ver.outputs.next }}"/' project.yml
           sed -i '' -E 's/(CURRENT_PROJECT_VERSION: )"[^"]*"/\1"${{ steps.ver.outputs.next }}"/' project.yml
 
-      - name: Commit version bump + signed appcast to main, tag
+      - name: Commit version bump + signed appcast to main
         if: ${{ !inputs.dry_run }}
+        env:
+          RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
           set -euo pipefail
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          # Supply the PAT only at push time via an env-reading credential helper —
+          # the token is never written to .git/config or a command line.
+          # shellcheck disable=SC2016  # $RELEASE_TOKEN is expanded by the helper at push time, not now
+          git config credential.helper '!f() { echo username=x-access-token; echo "password=$RELEASE_TOKEN"; }; f'
           git add project.yml appcast.xml
           git commit -m "release: ${{ steps.ver.outputs.next }} (signed appcast + version bump)"
-          git tag "${{ steps.ver.outputs.tag }}"
           git push origin HEAD:main
-          git push origin "${{ steps.ver.outputs.tag }}"
-
-      - name: Create GitHub Release
-        if: ${{ !inputs.dry_run }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release create "${{ steps.ver.outputs.tag }}" "${{ steps.dmg.outputs.path }}" \
-            --title "Mimer ${{ steps.ver.outputs.next }}" --generate-notes
 
       - name: Bump Homebrew tap
         if: ${{ !inputs.dry_run }}
         env:
-          TAP_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
           set -euo pipefail
-          git clone "https://x-access-token:${TAP_TOKEN}@github.com/hasanjafri/homebrew-tap.git" tap
+          # shellcheck disable=SC2016  # $RELEASE_TOKEN is expanded by the helper at push time, not now
+          git config --global credential.helper '!f() { echo username=x-access-token; echo "password=$RELEASE_TOKEN"; }; f'
+          git clone https://github.com/hasanjafri/homebrew-tap.git tap
           cd tap
           sed -i '' -E 's/version "[0-9]+\.[0-9]+\.[0-9]+"/version "${{ steps.ver.outputs.next }}"/' Casks/mimer.rb
           sed -i '' -E 's/sha256 "[0-9a-f]{64}"/sha256 "${{ steps.dmg.outputs.sha256 }}"/' Casks/mimer.rb
