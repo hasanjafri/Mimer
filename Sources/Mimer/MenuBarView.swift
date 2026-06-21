@@ -236,6 +236,7 @@ private struct MenuActionRow: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
+            .frame(maxWidth: .infinity, alignment: .leading)   // full-width hover + click target
             .contentShape(Rectangle())
             .background(hovering ? Color.primary.opacity(0.08) : .clear,
                         in: RoundedRectangle(cornerRadius: 6))
