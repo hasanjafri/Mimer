@@ -33,18 +33,26 @@ look broken next to Raycast — done carefully, not as the headline.
 - Email detection (superseded by dev-domain awareness).
 - Privacy-respecting opt-in sync (possible later wedge).
 
-## Sequenced PRs (engineering-reviewed)
+## Sequenced PRs (engineering-reviewed, wedge-first)
 
-1. **Concurrency machinery** — background `NSManagedObjectContext` + serial worker queue;
-   `ClipItem` as the only actor-crossing type; `-strict-concurrency=complete` warnings in
-   Swift 5 mode. **Not** a big-bang Swift 6 language-mode flip (that's a later cleanup).
-2. **Encrypt at rest** — owns the **full** at-rest story up front: SQLCipher whole-DB +
+Lead with the wedge (pure-logic, no data-model/concurrency deps); keep encryption before
+images; concurrency machinery sits just before the image/OCR work that needs it.
+
+1. **Transform engine v2 + paste-as-plain (`⌥⏎`).** *In progress.* Shipped: developer
+   transforms — Decode JWT, Strip tracking params, Decode query string, Unix↔ISO 8601
+   (pure, gated, unit-tested). Next in this bucket: JSON→TypeScript/Go, diff two clips,
+   transform chains, apply-and-paste-without-mutating-clipboard, and paste-as-plain.
+2. **Developer-domain awareness** (git-SHA / issue-key / stack-trace `file:line` /
+   secret detection — replaces email detection).
+3. **Scoped/regex search + paste-stack** (`type:`/`app:`/`/regex/`; queue visibly ordered,
+   `⏎` never overloaded).
+4. **Encrypt at rest** — owns the **full** at-rest story up front: SQLCipher whole-DB +
    Keychain key **and** per-blob AES-GCM for the future image dir; copy-not-mutate
-   migration of the existing text-only store with count-parity verification + no-loss
-   retry. Done while the store is small (re-keying MB blobs later is far riskier).
-3. **Transform engine v2 + paste-as-plain (`⌥⏎`).**
-4. **Developer-domain awareness** (git-SHA / issue / stack-trace / secret detection).
-5. **Scoped/regex search + paste-stack** (queue visibly ordered; `⏎` never overloaded).
+   migration of the text-only store with count-parity verification + no-loss retry. Still
+   lands **before** images, while the store is small (re-keying MB blobs later is riskier).
+5. **Concurrency machinery** — background `NSManagedObjectContext` + serial worker queue;
+   `ClipItem` as the only actor-crossing type; `-strict-concurrency=complete` warnings in
+   Swift 5 mode. **Not** a big-bang Swift 6 flip. (Prereq for off-main image/OCR capture.)
 6. **Image clips** — file-backed, content-addressed `SHA256(raw bytes)`, `CGImageSource`
    thumbnails, lazy full image, **blob cleanup in prune/delete + orphan sweep**,
    main-thread atomic snapshot then off-main hash/thumbnail.

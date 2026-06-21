@@ -68,8 +68,11 @@ Typical loop: edit → `xcodebuild build` → relaunch the Debug app → drive v
 - `PersistenceController` — programmatic `NSManagedObjectModel`, local sqlite, lightweight
   migration.
 - `Clip` / `ClipKind` — `detect()` classifies link / code / hex-color / text (conservative).
-- `ClipTransform` — ⌘K transforms (UPPER/lower/Title, trim, slugify, base64, url, json);
-  `applicable(to:)` hides no-ops and inapplicable ones.
+- `ClipTransform` — ⌘K transforms (pure `String -> String?`, nil = hidden). Generic:
+  UPPER/lower/Title, trim, slugify, base64, url, json. Developer (gated, only shown when
+  they apply): Decode JWT, Strip tracking params, Decode query string, Unix↔ISO 8601.
+  `applicable(to:)` hides no-ops/inapplicable. This is the wedge — extend here per
+  `docs/ROADMAP.md` (JSON→type, diff two clips, chains, paste-as-plain next).
 - `CommandPalettePanel` (nonactivating `NSPanel`, `canBecomeKey`) + `PaletteView` — the
   palette: search + ⌘K transform mode (search field stays mounted to keep focus).
   Keys: **⇧⌘V** toggle · ↑↓ · ⏎ paste · ⌘1-9 quick · ⌘K transform · ⌘D favorite ·

@@ -36,7 +36,9 @@ one-keystroke transforms — all local-first, no subscription, MIT-licensed.
 - **Command palette (⇧⌘V)** — fuzzy search, ↑↓ to move, ⏎ to paste back into the app you were in.
 - **Quick-paste (⌘1–⌘9)** — grab one of the top results instantly.
 - **Type-aware clips** — links, code, and colors get their own glyph; hex colors show a live swatch.
-- **⌘K transforms** — for the selected clip: `UPPER`/`lower`/`Title`, trim, slugify, Base64 encode/decode, URL encode/decode, JSON pretty-print/minify — each with a live preview, and only the ones that actually apply.
+- **⌘K transforms** — for the selected clip, each with a live preview and shown only when it applies:
+  - *General:* `UPPER`/`lower`/`Title`, trim, slugify, Base64 encode/decode, URL encode/decode, JSON pretty-print/minify.
+  - *Developer:* **Decode JWT**, **strip tracking params** from a URL, **decode a query string**, **Unix ↔ ISO 8601** timestamps — with more coming (JSON→type, diff two clips, chains).
 - **Favorites** — ⌘D (or the ★) keeps a clip forever, pinned in its own section.
 - **Snippets** — author reusable text (signatures, boilerplate) that lives in the palette forever.
 - **Pause + per-app exclusions** — stop recording on demand, or never record while chosen apps are frontmost. Password managers are always ignored.
