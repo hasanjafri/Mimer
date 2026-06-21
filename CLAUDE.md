@@ -2,11 +2,12 @@
 
 Mimer is a fast, private, **developer-first clipboard manager for macOS**, shipped
 open-source (MIT). It matches Maccy/CopyClip and adds what they lack — type-aware
-clips and ⌘K transforms — for free. **v0.1.0 is live.**
+clips and ⌘K transforms — for free. **v0.2.1 is live**, auto-updating via Sparkle.
 
 - Repo: https://github.com/hasanjafri/Mimer · Tap: https://github.com/hasanjafri/homebrew-tap
 - Install: `brew install --cask hasanjafri/tap/mimer` (or the notarized DMG on the release)
-- Deep context: `docs/` — RESEARCH, DESIGN, PLAN, REVIEW, FORWARD_REVIEW, CODE_REVIEW.
+- Deep context: `docs/` — RESEARCH, DESIGN, PLAN, REVIEW, FORWARD_REVIEW, CODE_REVIEW,
+  **CICD** (CI + release pipeline), **ROADMAP** (the wedge-first plan to beat Raycast).
 
 ## Build & test
 
@@ -20,8 +21,9 @@ xcodebuild -project Mimer.xcodeproj -scheme Mimer -configuration Debug \
   -destination 'platform=macOS,arch=arm64' CODE_SIGNING_ALLOWED=NO test   # 28 tests
 ```
 
-- Swift 6 toolchain, **Swift 5 language mode** (`SWIFT_VERSION 5.0`). Full Swift 6
-  `@MainActor` migration is deferred (do it before moving capture off-main for images).
+- Swift 6 toolchain, **Swift 5 language mode** (`SWIFT_VERSION 5.0`). Plan: add concurrency
+  *machinery* (background context + worker queue) first, flip to Swift 6 language mode later
+  — see `docs/ROADMAP.md`. CI runs on **macos-15** (Xcode 16 — 15.x can't read XcodeGen's v16 project format).
 - macOS 14+, menu-bar agent (`LSUIElement`, no Dock icon), **non-sandboxed** (needs the
   clipboard, a global hotkey, frontmost-app lookups, and CGEvent posting). Hardened
   runtime + `Mimer.entitlements` (sandbox explicitly off).
@@ -41,9 +43,11 @@ Release — never let it ship). When running a Debug build it watches
 - **See the UI with no Screen Recording permission**: `snapshot` renders the app's own
   windows to PNGs in `_snapshots/` (ImageRenderer + NSView `cacheDisplay`); read those
   PNGs directly. Findings: `cacheDisplay` is flaky for SwiftUI text/buttons on some
-  windows (live-window capture > ImageRenderer for TextField/scroll views); real
-  keystrokes / true `screencapture` need Screen Recording + Accessibility granted to
-  the **host terminal**, which isn't set up (and isn't needed for UI critique).
+  windows (live-window capture > ImageRenderer for TextField/scroll views).
+- **Real-input E2E (opt-in):** granting **Screen Recording + Accessibility** to the host
+  terminal unlocks true `screencapture` + real keystrokes/clicks (`cliclick`/`osascript`)
+  — the actual ⇧⌘V → type → ⏎ → paste-into-app flow. Not required for UI critique; use it
+  to verify end-to-end behavior. Prefer the DebugBridge for deterministic state/logic.
 
 Typical loop: edit → `xcodebuild build` → relaunch the Debug app → drive via bridge →
 `snapshot` → read the PNG → commit.
@@ -76,18 +80,24 @@ Typical loop: edit → `xcodebuild build` → relaunch the Debug app → drive v
   `Preferences`, `LaunchAtLogin` (SMAppService), `UpdaterController` (Sparkle),
   `ClipKindUI` (KindIcon + `Color(hexString:)`).
 
-## Release process
+## CI/CD & release  (full detail: `docs/CICD.md`)
 
-Prereqs (on the build machine): a *Developer ID Application* cert in the keychain, and
-notarytool creds stored as the keychain profile **`mimer-notary`**. Sparkle's EdDSA
-private key is in the keychain; the public key is `SUPublicEDKey` in `project.yml`.
-
-```sh
-./scripts/release.sh 0.2.0     # xcodegen → archive → sign → notarize → DMG → sign appcast
-gh release create v0.2.0 build/Mimer-0.2.0.dmg --title "Mimer 0.2.0" --notes-file notes.md
-git add appcast.xml && git commit && git push            # activates auto-update
-# then bump version + sha256 in the homebrew-tap repo's Casks/mimer.rb and push
-```
+- **CI** (`.github/workflows/ci.yml`) — every PR + push to `main`: `xcodegen generate`,
+  the 28-test suite, and a Release build (guards that `#if DEBUG` DebugBridge never ships).
+  Job name **`Build & test`** is a required status check.
+- **Release** (`.github/workflows/release.yml`) — **owner-only**, manual (Actions ▸ Release ▸
+  Run workflow) with a patch/minor/major bump and a `dry_run` toggle. It recreates the
+  signing keychain from secrets and runs `scripts/release.sh` unchanged, then publishes:
+  GitHub Release + DMG → signed Sparkle `appcast.xml` on `main` → Homebrew tap bump. So a
+  release lands on Releases + `brew upgrade --cask mimer` + in-app auto-update, hands-off.
+  **Run `dry_run: true` first** after any release-pipeline change.
+- **`main` is branch-protected:** contributors must PR (CI must pass); the owner can push
+  directly; no force-push/deletion; releases are owner-gated.
+- **CFBundleVersion = git commit count** (a monotonic integer), set by `release.sh` at
+  build time — NOT the marketing version (Sparkle compares CFBundleVersion; a dotted
+  marketing version sorts below an earlier integer build and breaks updates).
+- Local release still works: `./scripts/release.sh <version>` (uses the keychain
+  `mimer-notary` profile + Sparkle key; in CI the Sparkle key is piped via `SPARKLE_ED_KEY`).
 
 App icon is regenerable: `swift scripts/make_icon.swift /tmp/icon.png` (indigo→violet
 squircle + white clipboard), then re-size into `Assets.xcassets/AppIcon.appiconset`.
@@ -96,14 +106,19 @@ squircle + white clipboard), then re-size into `Assets.xcassets/AppIcon.appicons
 
 - **Small atomic commits**, one logical change each; build + test + (for UI) a snapshot
   before committing. Commit trailer: `Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>`.
+- **`main` is protected — branch + PR, never push straight to main.** CI (`Build & test`)
+  must pass before merge. Branch each PR off the latest `main` (merge the prior PR first
+  to avoid conflicts).
+- **Update `CLAUDE.md` and `README.md` in the same PR** whenever status/process/
+  architecture/features change — keep docs from drifting.
+- **E2E-verify each PR** via the self-test loop (and real-input E2E when granted).
 - Confirm before outward-facing actions (cutting a release, creating repos).
 - Be the developer: self-verify and exercise taste; surface findings, don't just wait.
 
-## Status & 0.2.0 candidates
+## Status & roadmap
 
-v0.1.0 shipped + audited (`docs/CODE_REVIEW.md`). Open/deferred:
-- Full Swift 6 `@MainActor` migration (pre-requisite for off-main capture).
-- Rich types (images/files), paste-stack, more transforms.
-- Encrypt history at rest (today: local + unencrypted, documented honestly).
-- Automate the tap-cask version/sha bump inside `release.sh`.
-- `⌥⏎` paste-as-plain once rich types exist; delete-undo.
+**v0.2.1 shipped**, with CI/CD + Sparkle auto-update + a Homebrew tap, all live and
+audited (`docs/CODE_REVIEW.md`). Strategy is decided: **wedge-first hybrid** — lead with
+the transform engine + developer-domain awareness + provable privacy; ship images/files/
+filters as hygiene; defer OCR. Full sequenced plan + risks + design invariants in
+**`docs/ROADMAP.md`**. (Tap version/sha bump is now automated by the release Action.)

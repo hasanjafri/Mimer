@@ -9,8 +9,9 @@ your menu bar, remembers everything you copy, and gets out of the way until you
 press **⇧⌘V**. It does what CopyClip and Maccy do — and then keeps going: it
 understands what you copied (links, code, colors) and can *transform* it on the spot.
 
-> Status: pre-release. A working v1 (history, favorites, snippets, transforms);
-> building toward the first notarized release + Homebrew cask.
+> Status: **v0.2.1 — live.** Notarized, Homebrew-installable, and auto-updating via
+> Sparkle. Next up: leaning into the developer wedge (richer transforms, dev-aware clips,
+> encrypted-at-rest privacy) — see [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ---
 
