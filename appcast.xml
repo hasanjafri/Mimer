@@ -1,10 +1,18 @@
-<?xml version="1.0" encoding="utf-8"?>
-<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
-  <channel>
-    <title>Mimer</title>
-    <link>https://raw.githubusercontent.com/hasanjafri/Mimer/main/appcast.xml</link>
-    <description>Updates for Mimer.</description>
-    <!-- Release <item>s are generated + signed by Sparkle's generate_appcast at
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+    <channel>
+        <title>Mimer</title>
+        <link>https://raw.githubusercontent.com/hasanjafri/Mimer/main/appcast.xml</link>
+        <description>Updates for Mimer.</description>
+        <!-- Release <item>s are generated + signed by Sparkle's generate_appcast at
          release time (run by scripts/release.sh); commit the updated file. -->
-  </channel>
+        <item>
+            <title>0.1.0</title>
+            <pubDate>Sat, 20 Jun 2026 20:20:37 -0400</pubDate>
+            <sparkle:version>0.1.0</sparkle:version>
+            <sparkle:shortVersionString>0.1.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <enclosure url="https://github.com/hasanjafri/Mimer/releases/download/v0.1.0/Mimer-0.1.0.dmg" length="2380767" type="application/octet-stream" sparkle:edSignature="et1A/Ef0Nn8gsqp51l47VfAwRnzEj1m7WSm/emqHNojNZwQv9GxvbxixWThFvZgxwe74UHZn6HRTCgzlL34+DQ=="/>
+        </item>
+    </channel>
 </rss>
