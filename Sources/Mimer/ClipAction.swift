@@ -25,8 +25,9 @@ enum ClipAction: Equatable {
     static func of(_ text: String) -> ClipAction? {
         if SecretDetector.isSecret(text) { return .revealSecret }
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !t.isEmpty, !t.contains(where: \.isWhitespace) else { return nil }
-        if let url = httpURL(t) { return .openURL(url) }
+        guard !t.isEmpty, !t.contains(where: \.isNewline) else { return nil }   // single line only
+        // URLs never contain raw spaces; file paths can ("/Users/me/My Documents/x").
+        if !t.contains(" "), let url = httpURL(t) { return .openURL(url) }
         if let file = existingFileURL(t) { return .revealInFinder(file) }
         return nil
     }

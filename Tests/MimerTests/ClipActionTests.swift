@@ -34,9 +34,23 @@ final class ClipActionTests: XCTestCase {
         }
     }
 
+    func testRevealsFilePathWithSpaces() {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("clip action \(UUID().uuidString)", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let file = dir.appendingPathComponent("My File.txt")
+        try? "x".write(to: file, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        if case .revealInFinder(let u)? = ClipAction.of(file.path) {
+            XCTAssertEqual(u.path, file.path)
+        } else { XCTFail("a path with spaces should reveal") }
+    }
+
     func testNoActionCases() {
         XCTAssertNil(ClipAction.of("just a sentence"))
         XCTAssertNil(ClipAction.of(""))
+        XCTAssertNil(ClipAction.of("line one\nline two"))                      // multi-line ≠ single entity
         XCTAssertNil(ClipAction.of("/no/such/path/\(UUID().uuidString).txt"))  // doesn't exist
         XCTAssertNil(ClipAction.of("relative/path.txt"))                       // not absolute → unresolvable
     }
