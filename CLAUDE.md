@@ -85,10 +85,12 @@ Typical loop: edit → `xcodebuild build` → relaunch the Debug app → drive v
 - `Clip` / `ClipKind` — `detect()` classifies link / code / hex-color / text + developer
   tokens (git SHA / issue key `ABC-123` / file ref incl. stack-trace `path:line:col`), all
   conservative. Drives the row icon (`ClipKindUI`) on new captures.
-- `ClipAction` — the **live** "act on this clip" (⌘O), derived from text (not stored kind, so
-  it works on old clips too): reveal a masked secret · open an http/https link · reveal an
-  existing file path in Finder. Config-free only; open-commit/issue/editor (needs a remote/
-  tracker/editor) is deferred. Side-effect-light + user-initiated (never executes anything).
+- `ClipAction` — the **live** "act on this clip" (⌘O), derived from text + a `DevConfig` (not
+  stored kind, so it works on old clips too). Config-free: reveal a masked secret · open an
+  http/https link · reveal an existing file in Finder. Configurable (Settings → Developer,
+  `Preferences.devConfig`): git SHA → open commit on a remote · issue key → open in a tracker
+  (`{KEY}` template) · `file:line` → open in VS Code/Cursor (`vscode://file/…:line:col`). Every
+  action opens a URL or reveals a file — never executes anything; web links stay http/https-only.
 - `SecretDetector` — pure, high-precision detection of secrets (API keys, tokens, PEM
   private keys, secret env assignments). Used to **mask** secrets in the list (lock glyph +
   `AWS key ••••1234`), NOT to skip them — Mimer is local/no-cloud and devs re-paste secrets
@@ -117,7 +119,7 @@ Typical loop: edit → `xcodebuild build` → relaunch the Debug app → drive v
   `handleKey` (a single `.onKeyPress(phases:.down)`) so ⏎/⇧⏎/⇥ never collide.
 - `MenuBarView` / `MenuBarLabel` — dropdown + the capture pulse (icon bounce + checkmark)
   and paused dimming.
-- `Onboarding*`, `Settings*` (General / Privacy / About), `SnippetComposer*`,
+- `Onboarding*`, `Settings*` (General / Privacy / Developer / About), `SnippetComposer*`,
   `Preferences`, `LaunchAtLogin` (SMAppService), `UpdaterController` (Sparkle),
   `ClipKindUI` (KindIcon + `Color(hexString:)`).
 
@@ -166,8 +168,10 @@ filters as hygiene; defer OCR. Full sequenced plan + risks + design invariants i
 
 Shipped since 0.2.1 (unreleased on `main`): **secret detection + masking** (`SecretDetector`),
 **encrypt history at rest** (`Cryptor`, AES-GCM + Keychain key, lazy migration + vacuum), and
-**developer-domain awareness** (type detection + ⌘O config-free act-on via `ClipAction`), and
+**developer-domain awareness** (type detection + ⌘O act-on incl. configurable open-commit/
+issue/editor integrations via `ClipAction`), and
 **scoped/regex search** (`SearchQuery` — `type:`/`is:`/`app:`/`/regex/`, with `Clip.sourceApp`
-capture) and **paste-stack** (`PasteStack` — ⇥ queue, ⇧⏎ paste in order). Next in flight: the
-configurable act-on integrations (open commit/issue/editor, Settings → Developer), and more
-transforms.
+capture), **paste-stack** (`PasteStack` — ⇥ queue, ⇧⏎ paste in order), **more transforms**
+(JSON→TS, line ops, case), and **configurable act-on integrations** (Settings → Developer:
+open commit/issue/editor). Next in flight: concurrency machinery (Swift 6 prep), then image
+clips (with per-blob encryption).

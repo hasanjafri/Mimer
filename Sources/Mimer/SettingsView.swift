@@ -11,10 +11,12 @@ struct SettingsView: View {
                 .tabItem { Label("General", systemImage: "gearshape") }
             PrivacySettingsView()
                 .tabItem { Label("Privacy", systemImage: "hand.raised") }
+            DeveloperSettingsView()
+                .tabItem { Label("Developer", systemImage: "hammer") }
             AboutSettingsView()
                 .tabItem { Label("About", systemImage: "info.circle") }
         }
-        .frame(width: 460, height: 360)
+        .frame(width: 460, height: 380)
     }
 }
 
@@ -45,6 +47,47 @@ private struct GeneralSettingsView: View {
                     }
             } header: {
                 Text("Startup")
+            }
+        }
+        .formStyle(.grouped)
+        .padding()
+    }
+}
+
+private struct DeveloperSettingsView: View {
+    @ObservedObject private var prefs = Preferences.shared
+
+    var body: some View {
+        Form {
+            Section {
+                TextField("github.com/acme/app", text: $prefs.gitRemoteBase)
+                    .textFieldStyle(.roundedBorder)
+            } header: {
+                Text("Git remote")
+            } footer: {
+                Text("⌘O on a commit SHA opens it at this remote (…/commit/<sha>). Leave blank to disable.")
+            }
+
+            Section {
+                TextField("https://acme.atlassian.net/browse/{KEY}", text: $prefs.issueTrackerTemplate)
+                    .textFieldStyle(.roundedBorder)
+            } header: {
+                Text("Issue tracker")
+            } footer: {
+                Text("⌘O on an issue key (e.g. ABC-123) opens this URL with {KEY} replaced. Must contain {KEY}.")
+            }
+
+            Section {
+                Picker("Open file:line in", selection: $prefs.editorKind) {
+                    Text("Finder (default)").tag("")
+                    ForEach(ClipAction.DevConfig.Editor.allCases, id: \.rawValue) { editor in
+                        Text(editor.displayName).tag(editor.rawValue)
+                    }
+                }
+            } header: {
+                Text("Editor")
+            } footer: {
+                Text("⌘O on a file path or a stack-trace file:line opens it here; otherwise Finder reveals the file.")
             }
         }
         .formStyle(.grouped)
