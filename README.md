@@ -41,6 +41,7 @@ one-keystroke transforms — all local-first, no subscription, MIT-licensed.
   - *Developer:* **Decode JWT**, **strip tracking params** from a URL, **decode a query string**, **Unix ↔ ISO 8601** timestamps — with more coming (JSON→type, diff two clips, chains).
 - **Favorites** — ⌘D (or the ★) keeps a clip forever, pinned in its own section.
 - **Snippets** — author reusable text (signatures, boilerplate) that lives in the palette forever.
+- **Secret-aware** — detected API keys, tokens, and private keys are **masked** in the list (`AWS key ••••1234`, with a 🔒) so they're not on screen during a screenshare. They're still stored locally and pasted in full — unlike cloud tools, Mimer doesn't drop your secrets, it just hides them from view. Toggle in Privacy settings.
 - **Pause + per-app exclusions** — stop recording on demand, or never record while chosen apps are frontmost. Password managers are always ignored.
 - **Auto-paste (optional)** — ⏎ pastes straight into your previous app once you grant the one permission; otherwise the clip is on your clipboard for ⌘V.
 - **Launch at login**, configurable history size, and a configurable menu height.

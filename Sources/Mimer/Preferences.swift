@@ -30,6 +30,12 @@ final class Preferences: ObservableObject {
         didSet { defaults.set(Array(excludedBundleIDs), forKey: Keys.excludedBundleIDs) }
     }
 
+    /// Mask detected secrets (API keys, tokens, …) in the list. They're still stored and
+    /// pasted in full — only the on-screen display is masked (anti shoulder-surf/screenshare).
+    @Published var maskSecrets: Bool {
+        didSet { defaults.set(maskSecrets, forKey: Keys.maskSecrets) }
+    }
+
     private let defaults = UserDefaults.standard
     private enum Keys {
         static let historyLimit = "historyLimit"
@@ -37,6 +43,7 @@ final class Preferences: ObservableObject {
         static let hasOnboarded = "hasOnboarded"
         static let isPaused = "isPaused"
         static let excludedBundleIDs = "excludedBundleIDs"
+        static let maskSecrets = "maskSecrets"
     }
 
     private init() {
@@ -45,5 +52,6 @@ final class Preferences: ObservableObject {
         hasOnboarded = defaults.bool(forKey: Keys.hasOnboarded)
         isPaused = defaults.bool(forKey: Keys.isPaused)
         excludedBundleIDs = Set(defaults.stringArray(forKey: Keys.excludedBundleIDs) ?? [])
+        maskSecrets = defaults.object(forKey: Keys.maskSecrets) as? Bool ?? true   // default on
     }
 }

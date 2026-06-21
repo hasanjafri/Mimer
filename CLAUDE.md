@@ -68,6 +68,11 @@ Typical loop: edit → `xcodebuild build` → relaunch the Debug app → drive v
 - `PersistenceController` — programmatic `NSManagedObjectModel`, local sqlite, lightweight
   migration.
 - `Clip` / `ClipKind` — `detect()` classifies link / code / hex-color / text (conservative).
+- `SecretDetector` — pure, high-precision detection of secrets (API keys, tokens, PEM
+  private keys, secret env assignments). Used to **mask** secrets in the list (lock glyph +
+  `AWS key ••••1234`), NOT to skip them — Mimer is local/no-cloud and devs re-paste secrets
+  on purpose, so the full value is stored + pasted; only the display is masked. Toggle:
+  `Preferences.maskSecrets` (default on), Privacy settings.
 - `ClipTransform` — ⌘K transforms (pure `String -> String?`, nil = hidden). Generic:
   UPPER/lower/Title, trim, slugify, base64, url, json. Developer (gated, only shown when
   they apply): Decode JWT, Strip tracking params, Decode query string, Unix↔ISO 8601.

@@ -65,6 +65,12 @@ private struct PrivacySettingsView: View {
             }
 
             Section {
+                Toggle("Mask detected secrets", isOn: $prefs.maskSecrets)
+            } footer: {
+                Text("Hides API keys, tokens, and private keys in the list (shown as “API key ••••1234”). They're still stored locally and pasted in full — only the on-screen display is masked.")
+            }
+
+            Section {
                 if prefs.excludedBundleIDs.isEmpty {
                     Text("No excluded apps.").foregroundStyle(.secondary)
                 } else {

@@ -128,6 +128,8 @@ final class DebugBridge {
     }
 
     private func writeState() {
+        // Never write a raw secret to the debug state file (it's plaintext on disk).
+        let redact: (String) -> String = { SecretDetector.maskedPreview($0) ?? $0 }
         let state: [String: Any] = [
             "paletteVisible": PaletteController.shared.isPaletteVisible,
             "paletteKey": PaletteController.shared.isPaletteKey,
@@ -136,8 +138,8 @@ final class DebugBridge {
             "settingsVisible": SettingsWindowController.shared.isVisible,
             "isPaused": Preferences.shared.isPaused,
             "clipCount": ClipStore.shared.items.count,
-            "clips": Array(ClipStore.shared.items.prefix(10).map(\.text)),
-            "favorites": ClipStore.shared.items.filter(\.isFavorite).map(\.text)
+            "clips": Array(ClipStore.shared.items.prefix(10).map { redact($0.text) }),
+            "favorites": ClipStore.shared.items.filter(\.isFavorite).map { redact($0.text) }
         ]
         if let data = try? JSONSerialization.data(
             withJSONObject: state, options: [.prettyPrinted, .sortedKeys]
