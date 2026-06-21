@@ -104,6 +104,7 @@ struct ClipTransform: Identifiable {
         while b64.count % 4 != 0 { b64 += "=" }
         guard let data = Data(base64Encoded: b64),
               let obj = try? JSONSerialization.jsonObject(with: data),
+              obj is [String: Any],   // JWT header/payload are JSON objects, not arrays/scalars
               let pretty = try? JSONSerialization.data(withJSONObject: obj,
                   options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]) else { return nil }
         return String(data: pretty, encoding: .utf8)
@@ -114,12 +115,19 @@ struct ClipTransform: Identifiable {
         "mc_eid", "mc_cid", "igshid", "ref", "ref_src", "ref_url", "_hsenc", "_hsmi", "vero_id"
     ]
 
+    /// Parse only a real http/https URL (exact scheme, non-empty host) so the URL
+    /// transforms don't fire on `httpx://…` or a bare `foo?bar=baz`.
+    private static func httpURLComponents(_ s: String) -> URLComponents? {
+        guard let c = URLComponents(string: s.trimmingCharacters(in: .whitespacesAndNewlines)),
+              let scheme = c.scheme?.lowercased(), scheme == "http" || scheme == "https",
+              c.host?.isEmpty == false else { return nil }
+        return c
+    }
+
     /// Remove common tracking params (utm_*, gclid, fbclid, …) from an http(s) URL.
     /// Returns nil for non-URLs or when nothing would be stripped, so it stays hidden.
     private static func stripTrackingParams(_ s: String) -> String? {
-        let t = s.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard var comps = URLComponents(string: t), comps.scheme?.hasPrefix("http") == true,
-              let items = comps.queryItems else { return nil }
+        guard var comps = httpURLComponents(s), let items = comps.queryItems else { return nil }
         let kept = items.filter { item in
             let name = item.name.lowercased()
             return !name.hasPrefix("utm_") && !trackingParams.contains(name)
@@ -131,24 +139,32 @@ struct ClipTransform: Identifiable {
 
     /// List an http(s) URL's query parameters one per line (`name = value`).
     private static func decodeQueryString(_ s: String) -> String? {
-        let t = s.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let comps = URLComponents(string: t), let items = comps.queryItems, !items.isEmpty else { return nil }
+        guard let comps = httpURLComponents(s), let items = comps.queryItems, !items.isEmpty else { return nil }
         return items.map { "\($0.name) = \($0.value ?? "")" }.joined(separator: "\n")
     }
 
-    /// A 10- or 13-digit Unix timestamp → ISO-8601 UTC. Gated on digit count so it
-    /// doesn't fire on arbitrary numbers.
+    /// A Unix timestamp → ISO-8601 UTC. 9–10 digits = seconds (≈1973–2286),
+    /// 12–13 = milliseconds. Gated on digit count so it doesn't fire on arbitrary numbers.
     private static func unixToISO(_ s: String) -> String? {
         let t = s.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard t.count == 10 || t.count == 13, t.allSatisfy(\.isNumber), let n = Double(t) else { return nil }
-        let seconds = t.count == 13 ? n / 1000 : n
+        guard t.allSatisfy(\.isNumber), let n = Double(t) else { return nil }
+        let seconds: Double
+        switch t.count {
+        case 9, 10:  seconds = n
+        case 12, 13: seconds = n / 1000
+        default:     return nil
+        }
         return ISO8601DateFormatter().string(from: Date(timeIntervalSince1970: seconds))
     }
 
-    /// An ISO-8601 datetime → Unix seconds. Gated on a successful ISO parse.
+    /// An ISO-8601 datetime → Unix seconds. Tries plain then fractional-second parsing,
+    /// so `…:22Z` and `…:22.123Z` both work. Gated on a successful ISO parse.
     private static func isoToUnix(_ s: String) -> String? {
         let t = s.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let date = ISO8601DateFormatter().date(from: t) else { return nil }
+        let plain = ISO8601DateFormatter()
+        let fractional = ISO8601DateFormatter()
+        fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        guard let date = plain.date(from: t) ?? fractional.date(from: t) else { return nil }
         return String(Int(date.timeIntervalSince1970))
     }
 }
