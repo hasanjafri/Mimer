@@ -9,6 +9,7 @@ struct MenuBarView: View {
 
     @State private var hoverID: UUID?
     @State private var copiedID: UUID?
+    @State private var copyGeneration = 0
 
     private let rowHeight: CGFloat = 30
 
@@ -82,6 +83,9 @@ struct MenuBarView: View {
             .padding(.vertical, 4)
         }
         .frame(height: listHeight)
+        // AppKit doesn't always deliver a row's hover-exit when the pointer leaves
+        // the window, so clear here when the pointer leaves the list entirely.
+        .onHover { if !$0 { hoverID = nil } }
     }
 
     #if DEBUG
@@ -127,16 +131,17 @@ struct MenuBarView: View {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.green)
                     .transition(.opacity)
-            } else {
-                Button {
-                    store.toggleFavorite(item.id)
-                } label: {
-                    Image(systemName: item.isFavorite ? "star.fill" : "star")
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(item.isFavorite ? AnyShapeStyle(Color.yellow) : AnyShapeStyle(.tertiary))
-                .help(item.isFavorite ? "Unfavorite" : "Favorite (kept forever)")
             }
+            // Star stays mounted (even during the copied flash) so favoriting is
+            // never blocked by the transient confirmation.
+            Button {
+                store.toggleFavorite(item.id)
+            } label: {
+                Image(systemName: item.isFavorite ? "star.fill" : "star")
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(item.isFavorite ? AnyShapeStyle(Color.yellow) : AnyShapeStyle(.tertiary))
+            .help(item.isFavorite ? "Unfavorite" : "Favorite (kept forever)")
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
@@ -146,19 +151,26 @@ struct MenuBarView: View {
             in: RoundedRectangle(cornerRadius: 6)
         )
         .contentShape(Rectangle())
-        .onHover { hovering in hoverID = hovering ? item.id : (hoverID == item.id ? nil : hoverID) }
+        .onHover { hovering in
+            if hovering { hoverID = item.id }
+            else if hoverID == item.id { hoverID = nil }
+        }
         .onTapGesture { copy(item) }
         .help("Click to copy to the clipboard")
     }
 
     /// Copy a clip and flash an inline "Copied" confirmation on its row — the
     /// menu-bar window stays open, so this is the only signal the click landed.
+    /// Only confirm if the write landed, and tag each click with a generation so
+    /// a re-copy's timer can't clear a later click's badge early.
     private func copy(_ item: ClipItem) {
-        Paster.copyToPasteboard(item.text)
-        let id = item.id
-        withAnimation(.easeOut(duration: 0.15)) { copiedID = id }
+        guard Paster.copyToPasteboard(item.text) else { return }
+        copyGeneration &+= 1
+        let generation = copyGeneration
+        withAnimation(.easeOut(duration: 0.15)) { copiedID = item.id }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
-            if copiedID == id { withAnimation(.easeOut(duration: 0.25)) { copiedID = nil } }
+            guard copyGeneration == generation else { return }
+            withAnimation(.easeOut(duration: 0.25)) { copiedID = nil }
         }
     }
 
