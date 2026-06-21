@@ -11,6 +11,9 @@ enum ClipKind: Int16 {
     case image = 4
     case file = 5
     case snippet = 6
+    case gitSHA = 7
+    case issueKey = 8
+    case fileRef = 9
 }
 
 extension ClipKind {
@@ -31,10 +34,31 @@ extension ClipKind {
                     return .link
                 }
             }
+            if let dev = developerToken(text) { return dev }
         }
         if isHexColor(text) { return .color }
         if looksLikeCode(raw) { return .code }
         return .text
+    }
+
+    /// Single-token developer entities (conservative). The act-on behavior lives in
+    /// `ClipAction`, computed live from text; this just drives the row icon for new captures.
+    private static func developerToken(_ t: String) -> ClipKind? {
+        if t.range(of: #"^[A-Z]{2,10}-[0-9]+$"#, options: .regularExpression) != nil { return .issueKey }
+        // 7–40 hex with at least one a–f letter, so plain decimal numbers aren't "SHAs".
+        if t.count >= 7, t.count <= 40,
+           t.range(of: #"^[0-9a-f]+$"#, options: .regularExpression) != nil,
+           t.contains(where: \.isLetter) { return .gitSHA }
+        if isFileRef(t) { return .fileRef }
+        return nil
+    }
+
+    private static func isFileRef(_ t: String) -> Bool {
+        let path = t.replacingOccurrences(of: #"(:[0-9]+){1,2}$"#, with: "", options: .regularExpression)
+        // A real path prefix, or a stack-trace "name.ext:line[:col]" (a :line was stripped).
+        if path.hasPrefix("/") || path.hasPrefix("~/") || path.hasPrefix("./") || path.hasPrefix("../") { return true }
+        if path != t, path.range(of: #"\.[A-Za-z0-9]{1,6}$"#, options: .regularExpression) != nil { return true }
+        return false
     }
 
     private static func isHexColor(_ s: String) -> Bool {

@@ -1,7 +1,9 @@
 import SwiftUI
 
 /// Command palette: search + result list over the persistent clipboard history.
-/// Keyboard: ↑↓ move · ⏎ paste · ⌘1–9 quick · ⌘K transform · ⌘D favorite · ⌫ delete · esc.
+/// Keyboard: ↑↓ move · ⏎ paste · ⌘1–9 quick · ⌘K transform · ⌘O act · ⌘D favorite · ⌫ delete · esc.
+/// ⌘O is the context-aware action for the selected clip (reveal a secret · open a link ·
+/// reveal a file in Finder) — see `ClipAction`.
 /// ⌘K opens transform mode for the selected clip (UPPER/lower, base64, JSON, …),
 /// with a live preview of each result. The search field stays mounted across modes
 /// so keyboard focus never drops.
@@ -20,6 +22,10 @@ struct PaletteView: View {
     // Transform mode (⌘K): when set, the list shows transforms for this clip.
     @State private var transformTarget: ClipItem?
     @State private var transformSelection = 0
+
+    // Secrets temporarily revealed via ⌘O. The panel is recreated on each open, so this
+    // resets to empty every time — revealed secrets re-mask once the palette closes.
+    @State private var revealedSecrets: Set<UUID> = []
 
     private var results: [ClipItem] {
         let snips = query.isEmpty ? store.snippets : store.snippets.filter { fuzzyMatch(query, $0.text) }
@@ -122,13 +128,16 @@ struct PaletteView: View {
 
     private func resultRow(index: Int, item: ClipItem) -> some View {
         let masked = SecretDetector.maskedPreview(item.text)   // nil unless it's a secret
+        let revealed = revealedSecrets.contains(item.id)
+        let showMasked = masked != nil && prefs.maskSecrets && !revealed
         return HStack(spacing: 8) {
             if masked != nil {
-                Image(systemName: "lock.fill").foregroundStyle(.orange).frame(width: 15)
+                Image(systemName: revealed ? "lock.open.fill" : "lock.fill")
+                    .foregroundStyle(.orange).frame(width: 15)
             } else {
                 KindIcon(kind: item.kind, text: item.text)
             }
-            Text((prefs.maskSecrets ? masked : nil) ?? item.text).lineLimit(1).truncationMode(.middle)
+            Text(showMasked ? masked! : item.text).lineLimit(1).truncationMode(.middle)
             Spacer(minLength: 0)
             if item.isFavorite {
                 Image(systemName: "star.fill").font(.caption).foregroundStyle(.yellow)
@@ -238,14 +247,19 @@ struct PaletteView: View {
     }
 
     private var footer: some View {
-        Text(transformTarget == nil
-             ? "↑↓ move · ⏎ paste · ⌘1–9 quick · ⌘K transform · ⌘D favorite · ⌘⌫ delete · esc"
-             : "↑↓ move · ⏎ apply · esc back")
+        Text(footerHint)
             .font(.caption2)
             .foregroundStyle(.tertiary)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
+    }
+
+    private var footerHint: String {
+        if transformTarget != nil { return "↑↓ move · ⏎ apply · esc back" }
+        let base = "↑↓ move · ⏎ paste · ⌘K transform · ⌘D favorite · ⌘⌫ delete · esc"
+        if let action = selectedAction { return "⌘O \(action.label) · \(base)" }
+        return base
     }
 
     // MARK: - Actions
@@ -281,7 +295,8 @@ struct PaletteView: View {
     private func handleCommandKey(_ press: KeyPress) -> KeyPress.Result {
         guard press.modifiers.contains(.command) else { return .ignored }
         if press.characters == "k" { toggleTransformMode(); return .handled }
-        guard transformTarget == nil else { return .ignored }   // ⌘⌫ / ⌘D / ⌘1–9 only in search mode
+        guard transformTarget == nil else { return .ignored }   // ⌘⌫ / ⌘D / ⌘1–9 / ⌘O only in search mode
+        if press.characters == "o" { actOnSelected(); return .handled }
         if press.key == .delete || press.characters == "\u{7f}" || press.characters == "\u{8}" {
             deleteSelected(); return .handled       // ⌘⌫ deletes the selected clip (plain ⌫ stays for editing the query)
         }
@@ -331,5 +346,29 @@ struct PaletteView: View {
     private func deleteSelected() {
         guard results.indices.contains(selection) else { return }
         store.delete(results[selection].id)
+    }
+
+    /// The context-aware action (⌘O) for the selected clip, or nil. Computed live from text.
+    private var selectedAction: ClipAction? {
+        guard transformTarget == nil, results.indices.contains(selection) else { return nil }
+        return ClipAction.of(results[selection].text)
+    }
+
+    private func actOnSelected() {
+        guard results.indices.contains(selection) else { return }
+        let item = results[selection]
+        switch ClipAction.of(item.text) {
+        case .revealSecret:
+            if revealedSecrets.contains(item.id) { revealedSecrets.remove(item.id) }
+            else { revealedSecrets.insert(item.id) }
+        case .openURL(let url):
+            NSWorkspace.shared.open(url)
+            onClose()
+        case .revealInFinder(let url):
+            NSWorkspace.shared.activateFileViewerSelecting([url])
+            onClose()
+        case .none:
+            break
+        }
     }
 }
