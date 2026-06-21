@@ -35,9 +35,10 @@ struct SearchQuery {
         var textTokens: [String] = []
         var usedOperator = false
 
-        // Pull a quoted multi-word app filter first: app:"Visual Studio Code".
+        // Pull every quoted app filter first (e.g. app:"Visual Studio Code") so no quoted
+        // value reaches the space-splitter and leaks quotes; the last one wins.
         var rest = raw
-        if let r = rest.range(of: #"app:"[^"]*""#, options: .regularExpression) {
+        while let r = rest.range(of: #"app:"[^"]*""#, options: .regularExpression) {
             let value = String(rest[r].dropFirst("app:\"".count).dropLast())
             if !value.isEmpty { q.appFilter = value; usedOperator = true }
             rest.removeSubrange(r)

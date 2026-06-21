@@ -30,6 +30,14 @@ final class SearchQueryTests: XCTestCase {
         XCTAssertEqual(SearchQuery.parse("app:\"unclosed").appFilter, "unclosed")
     }
 
+    func testMultipleQuotedAppFiltersNoQuoteLeak() {
+        // Two quoted app: filters — last wins, neither leaks quotes into the value or text.
+        let q = SearchQuery.parse("app:\"a b\" app:\"c d\" hi")
+        XCTAssertEqual(q.appFilter, "c d")
+        XCTAssertEqual(q.text, "hi")
+        XCTAssertFalse(q.text.contains("\""))
+    }
+
     func testAppPlusTextComposes() {
         let q = SearchQuery.parse("app:Terminal git")
         XCTAssertEqual(q.appFilter, "Terminal")
