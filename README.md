@@ -74,7 +74,7 @@ Mimer to Applications. Requires macOS 14+.
 **Homebrew:**
 
 ```sh
-brew install --cask hasanjafri/tap/mimer   # once the tap is published
+brew install --cask hasanjafri/tap/mimer
 ```
 
 **Build from source:**
