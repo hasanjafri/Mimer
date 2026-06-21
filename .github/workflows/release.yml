@@ -45,7 +45,7 @@ permissions:
 jobs:
   release:
     name: Build & publish
-    runs-on: macos-14
+    runs-on: macos-15   # Apple Silicon; default Xcode 16 — XcodeGen emits the v16 project format
     # Only the repository owner can cut a release — a merged contributor cannot.
     if: github.actor == github.repository_owner
     steps:

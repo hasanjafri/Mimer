@@ -17,7 +17,7 @@ concurrency:
 jobs:
   test:
     name: Build & test
-    runs-on: macos-14   # Apple Silicon runner — matches arch=arm64
+    runs-on: macos-15   # Apple Silicon (arch=arm64); default Xcode 16 — XcodeGen emits the v16 project format
     steps:
       - uses: actions/checkout@v4
 
