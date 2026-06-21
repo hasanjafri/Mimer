@@ -105,6 +105,10 @@ final class ClipTransformTests: XCTestCase {
         let escaped = transform("json2ts").apply("{\"a\\\"b\":1}")!
         XCTAssertTrue(escaped.contains("\"a\\\"b\": number;"))
         XCTAssertFalse(escaped.contains("\"a\"b\""))   // not the broken/unescaped form
+        // A key with a newline/control char stays a single valid TS string literal (no raw newline).
+        let nl = transform("json2ts").apply("{\"a\\nb\":1}")!
+        XCTAssertTrue(nl.contains("\"a\\nb\": number;"))
+        XCTAssertFalse(nl.contains("\"a\nb\""))        // not split across physical lines
     }
 
     func testLineOps() {

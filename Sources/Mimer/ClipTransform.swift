@@ -219,9 +219,20 @@ struct ClipTransform: Identifiable {
         s.range(of: #"^[A-Za-z_$][A-Za-z0-9_$]*$"#, options: .regularExpression) != nil
     }
 
-    /// A double-quoted TS string literal with backslash/quote escaping (for non-identifier keys).
+    /// A fully-escaped double-quoted string literal for non-identifier keys. Uses JSON string
+    /// encoding (escapes `\`, `"`, `\n`, `\r`, `\t`, and other controls as `\uXXXX`) — a valid
+    /// JSON string is a valid TS string literal — so keys with newlines/controls stay valid TS.
     private static func tsStringLiteral(_ s: String) -> String {
-        "\"" + s.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") + "\""
+        if let data = try? JSONSerialization.data(withJSONObject: [s]),
+           let arr = String(data: data, encoding: .utf8), arr.count >= 2 {
+            return String(arr.dropFirst().dropLast())   // ["..."] → "..."
+        }
+        return "\"" + s
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+            .replacingOccurrences(of: "\n", with: "\\n")
+            .replacingOccurrences(of: "\r", with: "\\r")
+            .replacingOccurrences(of: "\t", with: "\\t") + "\""
     }
 
     // MARK: - Line transforms (multi-line only, so they stay hidden for single-line clips)
