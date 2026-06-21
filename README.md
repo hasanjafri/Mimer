@@ -1,5 +1,7 @@
 # Mimer
 
+[![CI](https://github.com/hasanjafri/Mimer/actions/workflows/ci.yml/badge.svg)](https://github.com/hasanjafri/Mimer/actions/workflows/ci.yml)
+
 **A fast, private, developer-first clipboard manager for macOS — free and open source.**
 
 Named after *Mímir*, the Norse guardian of memory and knowledge, Mimer lives in

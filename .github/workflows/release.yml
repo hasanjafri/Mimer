@@ -1,0 +1,205 @@
+name: Release
+
+# Manual, version-bumping release from main. Builds → signs (Developer ID) →
+# notarizes → packages a DMG → publishes a GitHub Release → updates the signed
+# Sparkle appcast (auto-update feed) → bumps the Homebrew tap. Reuses
+# scripts/release.sh unchanged by recreating the signing keychain the script
+# expects (Developer ID cert, the `mimer-notary` profile, and the Sparkle key).
+#
+# Only the repository owner can run this (guarded below), and it pushes to the
+# protected main branch as the owner via RELEASE_TOKEN.
+#
+# Required repo secrets (Settings ▸ Secrets and variables ▸ Actions):
+#   DEVELOPER_ID_CERT_P12_BASE64  base64 of your exported Developer ID Application .p12
+#                                 (`base64 -i cert.p12 | pbcopy`)
+#   DEVELOPER_ID_CERT_PASSWORD    the password set when exporting that .p12
+#   KEYCHAIN_PASSWORD             any string — password for the throwaway CI keychain
+#   NOTARY_APPLE_ID               Apple ID email used for notarization
+#   NOTARY_TEAM_ID                10-char Developer Team ID
+#   NOTARY_PASSWORD              app-specific password (account.apple.com ▸ Sign-In and Security)
+#   SPARKLE_PRIVATE_KEY          the EdDSA private key (export: `generate_keys -x key.txt`, paste contents)
+#   RELEASE_TOKEN               a fine-grained PAT (owned by you) with Contents: read/write on BOTH
+#                               hasanjafri/Mimer and hasanjafri/homebrew-tap. Used to push the version
+#                               bump + appcast to protected main (as you, so it's allowed) and to bump
+#                               the tap. Keep it owner-only — this is what gates releases.
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Semantic version bump"
+        type: choice
+        options: [patch, minor, major]
+        default: patch
+      dry_run:
+        description: "Dry run: build/sign/notarize but do NOT publish, commit, tag, or bump the tap"
+        type: boolean
+        default: false
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write   # create the GitHub Release + push the version bump and appcast.xml to main
+
+jobs:
+  release:
+    name: Build & publish
+    runs-on: macos-14
+    # Only the repository owner can cut a release — a merged contributor cannot.
+    if: github.actor == github.repository_owner
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_TOKEN }}   # push to protected main as the owner
+
+      - name: Show toolchain
+        run: xcodebuild -version
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Compute next version
+        id: ver
+        run: |
+          set -euo pipefail
+          CUR=$(grep -E '^[[:space:]]*MARKETING_VERSION:' project.yml | head -1 \
+                | sed -E 's/.*"([0-9]+\.[0-9]+\.[0-9]+)".*/\1/')
+          IFS=. read -r MA MI PA <<< "$CUR"
+          case "${{ inputs.bump }}" in
+            major) MA=$((MA + 1)); MI=0; PA=0 ;;
+            minor) MI=$((MI + 1)); PA=0 ;;
+            patch) PA=$((PA + 1)) ;;
+          esac
+          NEXT="$MA.$MI.$PA"
+          {
+            echo "current=$CUR"
+            echo "next=$NEXT"
+            echo "tag=v$NEXT"
+          } >> "$GITHUB_OUTPUT"
+          echo "Releasing $CUR -> $NEXT (tag v$NEXT)"
+
+      - name: Refuse to clobber an existing tag
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --tags origin "${{ steps.ver.outputs.tag }}" >/dev/null 2>&1; then
+            echo "::error::Tag ${{ steps.ver.outputs.tag }} already exists on origin"; exit 1
+          fi
+
+      - name: Set up signing keychain
+        env:
+          CERT_P12_BASE64: ${{ secrets.DEVELOPER_ID_CERT_P12_BASE64 }}
+          CERT_PASSWORD: ${{ secrets.DEVELOPER_ID_CERT_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+          NOTARY_APPLE_ID: ${{ secrets.NOTARY_APPLE_ID }}
+          NOTARY_TEAM_ID: ${{ secrets.NOTARY_TEAM_ID }}
+          NOTARY_PASSWORD: ${{ secrets.NOTARY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          KC="$RUNNER_TEMP/mimer-signing.keychain-db"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KC"
+          security set-keychain-settings -lut 21600 "$KC"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KC"
+          # Default + searchable (keep existing keychains for the Apple Developer ID
+          # intermediate) so codesign, notarytool, and Sparkle all find what they need.
+          EXISTING=()
+          while IFS= read -r line; do
+            kc=$(printf '%s' "$line" | sed -e 's/^[[:space:]]*//' -e 's/"//g')
+            [ -n "$kc" ] && EXISTING+=("$kc")
+          done < <(security list-keychains -d user)
+          security default-keychain -s "$KC"
+          security list-keychains -d user -s "$KC" "${EXISTING[@]}"
+          # Developer ID Application certificate + private key.
+          echo "$CERT_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -P "$CERT_PASSWORD" -A -t cert -f pkcs12 -k "$KC"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KC"
+          rm -f "$RUNNER_TEMP/cert.p12"
+          # notarytool credentials under the keychain profile release.sh expects.
+          xcrun notarytool store-credentials mimer-notary \
+            --apple-id "$NOTARY_APPLE_ID" --team-id "$NOTARY_TEAM_ID" --password "$NOTARY_PASSWORD" \
+            --keychain "$KC"
+
+      - name: Import Sparkle signing key
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          # generate_keys ships as a prebuilt binary in the Sparkle SwiftPM artifact;
+          # resolve packages so it (and generate_appcast) are on disk before signing.
+          xcodegen generate
+          xcodebuild -project Mimer.xcodeproj -scheme Mimer -resolvePackageDependencies >/dev/null
+          GK=$(find ~/Library/Developer/Xcode/DerivedData/Mimer-*/SourcePackages -name generate_keys -type f 2>/dev/null | head -1)
+          if [ -z "$GK" ]; then echo "::error::generate_keys not found after package resolution"; exit 1; fi
+          printf '%s' "$SPARKLE_PRIVATE_KEY" > "$RUNNER_TEMP/sparkle_key"
+          "$GK" -f "$RUNNER_TEMP/sparkle_key"   # import into the (default) signing keychain
+          rm -f "$RUNNER_TEMP/sparkle_key"
+
+      - name: Build, sign, notarize, package (+ sign appcast)
+        run: scripts/release.sh "${{ steps.ver.outputs.next }}"
+
+      - name: Compute DMG sha256
+        id: dmg
+        run: |
+          set -euo pipefail
+          DMG="build/Mimer-${{ steps.ver.outputs.next }}.dmg"
+          test -f "$DMG"
+          echo "path=$DMG" >> "$GITHUB_OUTPUT"
+          echo "sha256=$(shasum -a 256 "$DMG" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+
+      - name: Bump version in project.yml
+        if: ${{ !inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          sed -i '' -E 's/(MARKETING_VERSION: )"[0-9]+\.[0-9]+\.[0-9]+"/\1"${{ steps.ver.outputs.next }}"/' project.yml
+          sed -i '' -E 's/(CURRENT_PROJECT_VERSION: )"[^"]*"/\1"${{ steps.ver.outputs.next }}"/' project.yml
+
+      - name: Commit version bump + signed appcast to main, tag
+        if: ${{ !inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add project.yml appcast.xml
+          git commit -m "release: ${{ steps.ver.outputs.next }} (signed appcast + version bump)"
+          git tag "${{ steps.ver.outputs.tag }}"
+          git push origin HEAD:main
+          git push origin "${{ steps.ver.outputs.tag }}"
+
+      - name: Create GitHub Release
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ steps.ver.outputs.tag }}" "${{ steps.dmg.outputs.path }}" \
+            --title "Mimer ${{ steps.ver.outputs.next }}" --generate-notes
+
+      - name: Bump Homebrew tap
+        if: ${{ !inputs.dry_run }}
+        env:
+          TAP_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          set -euo pipefail
+          git clone "https://x-access-token:${TAP_TOKEN}@github.com/hasanjafri/homebrew-tap.git" tap
+          cd tap
+          sed -i '' -E 's/version "[0-9]+\.[0-9]+\.[0-9]+"/version "${{ steps.ver.outputs.next }}"/' Casks/mimer.rb
+          sed -i '' -E 's/sha256 "[0-9a-f]{64}"/sha256 "${{ steps.dmg.outputs.sha256 }}"/' Casks/mimer.rb
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Casks/mimer.rb
+          git commit -m "mimer ${{ steps.ver.outputs.next }}"
+          git push
+
+      - name: Summary
+        run: |
+          {
+            echo "## Mimer ${{ steps.ver.outputs.next }} ${{ inputs.dry_run && '(dry run)' || '' }}"
+            echo ""
+            echo "| field | value |"
+            echo "| --- | --- |"
+            echo "| previous | ${{ steps.ver.outputs.current }} |"
+            echo "| released | ${{ steps.ver.outputs.next }} |"
+            echo "| tag | ${{ steps.ver.outputs.tag }} |"
+            echo "| dmg sha256 | \`${{ steps.dmg.outputs.sha256 }}\` |"
+          } >> "$GITHUB_STEP_SUMMARY"

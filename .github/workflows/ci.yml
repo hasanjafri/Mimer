@@ -1,0 +1,43 @@
+name: CI
+
+# Guards main: every PR and every push to main must build and pass the test
+# suite (28 tests) before it can land. The Release build is included because
+# DebugBridge is #if DEBUG only — a Release build that fails would mean debug-only
+# code leaked into the shipping configuration.
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Build & test
+    runs-on: macos-14   # Apple Silicon runner — matches arch=arm64
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: xcodebuild -version && swift --version
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate   # .xcodeproj + Info.plist are git-ignored, generated from project.yml
+
+      - name: Build & test (Debug)
+        run: |
+          set -o pipefail
+          xcodebuild -project Mimer.xcodeproj -scheme Mimer -configuration Debug \
+            -destination 'platform=macOS,arch=arm64' CODE_SIGNING_ALLOWED=NO test
+
+      - name: Release build (guards DebugBridge exclusion)
+        run: |
+          set -o pipefail
+          xcodebuild -project Mimer.xcodeproj -scheme Mimer -configuration Release \
+            -destination 'platform=macOS,arch=arm64' CODE_SIGNING_ALLOWED=NO build
