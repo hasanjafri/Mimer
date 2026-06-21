@@ -1,6 +1,5 @@
 import CoreData
 import Combine
-import CryptoKit
 
 /// The clipboard history, backed by Core Data. Publishes value-type `ClipItem`
 /// snapshots built from a lightweight *projection* fetch (never faults whole
@@ -23,17 +22,24 @@ final class ClipStore: ObservableObject {
     var historyLimitOverride: Int?
 
     private let persistence: PersistenceController
+    private let cryptor: Cryptor
     private var context: NSManagedObjectContext { persistence.viewContext }
 
-    init(persistence: PersistenceController = .shared) {
+    init(persistence: PersistenceController = .shared, cryptor: Cryptor = .shared) {
         self.persistence = persistence
+        self.cryptor = cryptor
     }
 
-    func loadInitial() { refresh() }
+    func loadInitial() {
+        if migrateToEncryptedIfNeeded() {
+            persistence.vacuum()   // scrub the now-freed pre-encryption plaintext
+        }
+        refresh()
+    }
 
     func insert(text: String) {
         let now = Date()
-        let hash = Self.contentHash(text)
+        let hash = cryptor.dedupeHash(text)
 
         let request = Clip.fetch()
         request.predicate = NSPredicate(format: "contentHash == %@ AND kind != %d", hash, ClipKind.snippet.rawValue)
@@ -45,7 +51,7 @@ final class ClipStore: ObservableObject {
         } else {
             let clip = NSEntityDescription.insertNewObject(forEntityName: "Clip", into: context) as! Clip
             clip.id = UUID()
-            clip.text = text
+            clip.text = cryptor.encrypt(text)
             clip.contentHash = hash
             clip.kind = ClipKind.detect(from: text).rawValue
             clip.createdAt = now
@@ -98,7 +104,7 @@ final class ClipStore: ObservableObject {
     func addSnippet(_ text: String) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        let hash = Self.contentHash(trimmed)
+        let hash = cryptor.dedupeHash(trimmed)
 
         let existing = Clip.fetch()
         existing.predicate = NSPredicate(format: "contentHash == %@ AND kind == %d", hash, ClipKind.snippet.rawValue)
@@ -107,7 +113,7 @@ final class ClipStore: ObservableObject {
 
         let clip = NSEntityDescription.insertNewObject(forEntityName: "Clip", into: context) as! Clip
         clip.id = UUID()
-        clip.text = trimmed
+        clip.text = cryptor.encrypt(trimmed)
         clip.contentHash = hash
         clip.kind = ClipKind.snippet.rawValue
         clip.createdAt = Date()
@@ -188,7 +194,8 @@ final class ClipStore: ObservableObject {
         let rows = (try? context.fetch(request)) ?? []
         return rows.compactMap { row in
             guard let id = row["id"] as? UUID,
-                  let text = row["text"] as? String,
+                  let stored = row["text"] as? String,
+                  let text = cryptor.decrypt(stored),   // nil = unreadable (key lost / corrupt) → skip
                   let createdAt = row["createdAt"] as? Date else { return nil }
             let kindRaw = (row["kind"] as? NSNumber)?.int16Value ?? 0
             let isFavorite = (row["isFavorite"] as? NSNumber)?.boolValue ?? false
@@ -202,7 +209,23 @@ final class ClipStore: ObservableObject {
         }
     }
 
-    private static func contentHash(_ text: String) -> String {
-        SHA256.hash(data: Data(text.utf8)).map { String(format: "%02x", $0) }.joined()
+    /// One-time, idempotent encrypt of any legacy plaintext rows (from before
+    /// encrypt-at-rest). The predicate matches only un-prefixed rows, so once the
+    /// store is fully encrypted this fetches nothing — no flag needed, and the
+    /// projection's no-blob-faulting guarantee is preserved on every later launch.
+    /// Re-encrypting recomputes `contentHash` as the keyed HMAC from the plaintext.
+    /// Returns true if any rows were rewritten (so the caller can vacuum once).
+    @discardableResult
+    private func migrateToEncryptedIfNeeded() -> Bool {
+        let request = Clip.fetch()
+        request.predicate = NSPredicate(format: "text != nil AND NOT (text BEGINSWITH %@)", Cryptor.prefix)
+        guard let legacy = try? context.fetch(request), !legacy.isEmpty else { return false }
+        for clip in legacy {
+            guard let plaintext = clip.text else { continue }
+            clip.text = cryptor.encrypt(plaintext)
+            clip.contentHash = cryptor.dedupeHash(plaintext)
+        }
+        save()
+        return true
     }
 }

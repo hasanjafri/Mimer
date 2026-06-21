@@ -28,10 +28,35 @@ final class PersistenceController {
         // Additive attributes (kind, contentHash) migrate via inferred lightweight migration.
         description?.shouldMigrateStoreAutomatically = true
         description?.shouldInferMappingModelAutomatically = true
+        // secure_delete zeros freed cells (so deletes/prunes and the one-time encryption
+        // rewrite don't leave plaintext in free pages), not just mark them reusable.
+        description?.setOption(["secure_delete": "ON"] as NSDictionary, forKey: NSSQLitePragmasOption)
         container.loadPersistentStores { _, error in
             if let error { NSLog("Mimer Core Data load error: \(error.localizedDescription)") }
         }
         container.viewContext.automaticallyMergesChangesFromParent = true
+    }
+
+    /// Rebuild the sqlite file (VACUUM) and truncate the WAL. VACUUM rewrites the
+    /// database from scratch, so free pages — which can still hold pre-encryption
+    /// plaintext even after the rows were re-encrypted — are dropped. Called once,
+    /// right after the encryption migration actually rewrites legacy rows.
+    func vacuum() {
+        let coordinator = container.persistentStoreCoordinator
+        guard let store = coordinator.persistentStores.first,
+              let url = store.url, url.path != "/dev/null" else { return }
+        do {
+            try coordinator.remove(store)
+            try coordinator.addPersistentStore(
+                ofType: NSSQLiteStoreType, configurationName: nil, at: url,
+                options: [NSSQLiteManualVacuumOption: true,
+                          NSSQLitePragmasOption: ["secure_delete": "ON"],
+                          NSMigratePersistentStoresAutomaticallyOption: true,
+                          NSInferMappingModelAutomaticallyOption: true])
+            container.viewContext.reset()
+        } catch {
+            NSLog("Mimer vacuum failed: \(error.localizedDescription)")
+        }
     }
 
     /// Single shared model instance (reused across containers to avoid duplicate-entity warnings).

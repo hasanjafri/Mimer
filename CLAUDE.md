@@ -63,10 +63,20 @@ Typical loop: edit → `xcodebuild build` → relaunch the Debug app → drive v
 - `CaptureGate` — pause + per-app exclusions + a password-manager bundle blocklist
   (belt-and-suspenders with ConcealedType, which is the primary defense).
 - `ClipStore` (`@MainActor`, Core Data) — projection (dictionary) fetch, batch-delete
-  prune (**favorites + snippets exempt**), SHA-256 `contentHash` dedupe; exposes `items`
-  (history) and `snippets`; `save()` rolls back on failure.
+  prune (**favorites + snippets exempt**), keyed-HMAC `contentHash` dedupe; exposes `items`
+  (history) and `snippets`; `save()` rolls back on failure. **Encrypts at rest:** `text` is
+  stored via `Cryptor.encrypt` and decrypted in the projection (`ClipItem.text` is plaintext
+  in memory only). On launch, `migrateToEncryptedIfNeeded()` lazily encrypts any legacy
+  plaintext rows; if it rewrote any, it calls `persistence.vacuum()` to scrub the freed
+  plaintext. `Cryptor` is injected (default `.shared`) so tests use a fixed key, never the Keychain.
+- `Cryptor` — app-layer field encryption (AES-GCM via CryptoKit), `"enc:v1:" + base64`;
+  keyed-HMAC `dedupeHash`. App-layer (not SQLCipher) **on purpose** — keeps the model
+  CloudKit-valid (ciphertext syncs fine). 256-bit key in the macOS Keychain
+  (`KeychainKey`, this-device-only); ephemeral fallback if the Keychain is unavailable.
 - `PersistenceController` — programmatic `NSManagedObjectModel`, local sqlite, lightweight
-  migration.
+  migration. `secure_delete=ON` (freed cells are zeroed, not just marked reusable);
+  `vacuum()` rebuilds the file + truncates the WAL to drop free-page plaintext after the
+  encryption migration.
 - `Clip` / `ClipKind` — `detect()` classifies link / code / hex-color / text (conservative).
 - `SecretDetector` — pure, high-precision detection of secrets (API keys, tokens, PEM
   private keys, secret env assignments). Used to **mask** secrets in the list (lock glyph +
@@ -130,3 +140,8 @@ audited (`docs/CODE_REVIEW.md`). Strategy is decided: **wedge-first hybrid** —
 the transform engine + developer-domain awareness + provable privacy; ship images/files/
 filters as hygiene; defer OCR. Full sequenced plan + risks + design invariants in
 **`docs/ROADMAP.md`**. (Tap version/sha bump is now automated by the release Action.)
+
+Shipped since 0.2.1 (unreleased on `main`): **secret detection + masking** (`SecretDetector`)
+and **encrypt history at rest** (`Cryptor`, AES-GCM + Keychain key, lazy migration + vacuum).
+Next in flight: finish developer-domain awareness (reveal-on-demand, git-SHA / issue-key /
+stack-trace detection), then scoped/regex search + paste-stack.

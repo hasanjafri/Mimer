@@ -50,10 +50,13 @@ images; concurrency machinery sits just before the image/OCR work that needs it.
    issue-key / stack-trace `file:line` detection + "act on" links.
 3. **Scoped/regex search + paste-stack** (`type:`/`app:`/`/regex/`; queue visibly ordered,
    `⏎` never overloaded).
-4. **Encrypt at rest** — owns the **full** at-rest story up front: SQLCipher whole-DB +
-   Keychain key **and** per-blob AES-GCM for the future image dir; copy-not-mutate
-   migration of the text-only store with count-parity verification + no-loss retry. Still
-   lands **before** images, while the store is small (re-keying MB blobs later is riskier).
+4. **Encrypt at rest** — *shipped (text).* `Cryptor` does **app-layer** AES-GCM on the
+   `text` field (`"enc:v1:"+base64`) with a 256-bit Keychain key, keyed-HMAC dedupe, and a
+   lazy in-place migration of the existing store that vacuums + `secure_delete`s the freed
+   plaintext. **App-layer, not SQLCipher** — SQLCipher is incompatible with the CloudKit-swap
+   the model preserves; ciphertext syncs fine. Pulled ahead of search because #8 began
+   *storing* secrets. Still owed when images land: **per-blob AES-GCM** for the image dir
+   (the blob hole below) — reuse the same Keychain key.
 5. **Concurrency machinery** — background `NSManagedObjectContext` + serial worker queue;
    `ClipItem` as the only actor-crossing type; `-strict-concurrency=complete` warnings in
    Swift 5 mode. **Not** a big-bang Swift 6 flip. (Prereq for off-main image/OCR capture.)
