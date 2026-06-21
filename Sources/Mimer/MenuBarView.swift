@@ -75,8 +75,8 @@ struct MenuBarView: View {
     private var clipList: some View {
         ScrollView {
             LazyVStack(spacing: 1) {
-                ForEach(Array(store.items.enumerated()), id: \.element.id) { index, item in
-                    row(index: index, item: item)
+                ForEach(store.items) { item in
+                    row(item: item)
                 }
             }
             .padding(.horizontal, 6)
@@ -92,8 +92,8 @@ struct MenuBarView: View {
     /// Non-scrolling render of the first rows, for the snapshot harness only.
     private var debugFlatClipList: some View {
         VStack(spacing: 1) {
-            ForEach(Array(store.items.prefix(6).enumerated()), id: \.element.id) { index, item in
-                row(index: index, item: item)
+            ForEach(Array(store.items.prefix(6))) { item in
+                row(item: item)
             }
         }
         .padding(.horizontal, 6)
@@ -102,35 +102,38 @@ struct MenuBarView: View {
     #endif
 
     private var header: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "doc.on.clipboard")
+        HStack(spacing: 7) {
+            Image(systemName: "doc.on.clipboard").foregroundStyle(.secondary)
             Text("Mimer").font(.headline)
             Spacer()
             if !store.items.isEmpty {
-                Text("\(store.items.count)").font(.caption).foregroundStyle(.secondary)
+                Text("\(store.items.count)")
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 2)
+                    .background(.quaternary, in: Capsule())   // distinct from the row hover fill
+                    .help("\(store.items.count) clips stored")
             }
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, 14)
         .padding(.vertical, 10)
     }
 
-    private func row(index: Int, item: ClipItem) -> some View {
+    private func row(item: ClipItem) -> some View {
         let isCopied = copiedID == item.id
         let isHovered = hoverID == item.id
-        return HStack(spacing: 8) {
-            Text("\(index + 1)")
-                .font(.caption.monospacedDigit())
-                .foregroundStyle(.tertiary)
-                .frame(width: 18, alignment: .trailing)
-            KindIcon(kind: item.kind, text: item.text)
+        return HStack(spacing: 10) {
+            KindIcon(kind: item.kind, text: item.text).frame(width: 16)
             Text(item.text).lineLimit(1).truncationMode(.middle)
-            Spacer(minLength: 0)
+            Spacer(minLength: 8)
             if isCopied {
-                Label("Copied", systemImage: "checkmark.circle.fill")
-                    .labelStyle(.titleAndIcon)
-                    .font(.caption.weight(.semibold))
+                // The full-row green tint already says "copied"; a bare check
+                // reinforces it without crowding the favorite star with a chip.
+                Image(systemName: "checkmark.circle.fill")
                     .foregroundStyle(.green)
                     .transition(.opacity)
+                    .help("Copied to the clipboard")
             }
             // Star stays mounted (even during the copied flash) so favoriting is
             // never blocked by the transient confirmation.
@@ -175,36 +178,71 @@ struct MenuBarView: View {
     }
 
     private var actions: some View {
-        VStack(spacing: 2) {
-            Button { PaletteController.shared.toggle() } label: {
-                Label("Open Mimer  ⇧⌘V", systemImage: "magnifyingglass")
-                    .frame(maxWidth: .infinity, alignment: .leading)
+        VStack(spacing: 1) {
+            MenuActionRow(title: "Open Mimer", systemImage: "magnifyingglass",
+                          shortcut: "⇧⌘V") {
+                PaletteController.shared.toggle()
             }
-            Button { prefs.isPaused.toggle() } label: {
-                Label(prefs.isPaused ? "Resume recording" : "Pause recording",
-                      systemImage: prefs.isPaused ? "play.fill" : "pause.fill")
-                    .frame(maxWidth: .infinity, alignment: .leading)
+            MenuActionRow(title: prefs.isPaused ? "Resume recording" : "Pause recording",
+                          systemImage: prefs.isPaused ? "play.fill" : "pause.fill") {
+                prefs.isPaused.toggle()
             }
-            Button { SnippetComposerWindowController.shared.show() } label: {
-                Label("New Snippet…", systemImage: "square.and.pencil")
-                    .frame(maxWidth: .infinity, alignment: .leading)
+            MenuActionRow(title: "New Snippet…", systemImage: "square.and.pencil") {
+                SnippetComposerWindowController.shared.show()
             }
-            Button { UpdaterController.shared.checkForUpdates() } label: {
-                Label("Check for Updates…", systemImage: "arrow.triangle.2.circlepath")
-                    .frame(maxWidth: .infinity, alignment: .leading)
+            MenuActionRow(title: "Check for Updates…", systemImage: "arrow.triangle.2.circlepath") {
+                UpdaterController.shared.checkForUpdates()
             }
-            Button { SettingsWindowController.shared.show() } label: {
-                Label("Settings…", systemImage: "gearshape")
-                    .frame(maxWidth: .infinity, alignment: .leading)
+            MenuActionRow(title: "Settings…", systemImage: "gearshape") {
+                SettingsWindowController.shared.show()
             }
-            Button { NSApplication.shared.terminate(nil) } label: {
-                Label("Quit Mimer", systemImage: "power")
-                    .frame(maxWidth: .infinity, alignment: .leading)
+
+            Divider().padding(.horizontal, 4).padding(.vertical, 3)
+
+            MenuActionRow(title: "Quit Mimer", systemImage: "power") {
+                NSApplication.shared.terminate(nil)
             }
         }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 6)
+    }
+}
+
+/// One row in the menu-bar footer: an aligned icon column, a label, and an
+/// optional right-aligned shortcut, with the same hover highlight, icon column,
+/// and padding as the clip rows so the whole menu reads as one surface.
+private struct MenuActionRow: View {
+    let title: String
+    let systemImage: String
+    var shortcut: String? = nil
+    let action: () -> Void
+
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 12))
+                    .frame(width: 16)
+                    .foregroundStyle(.secondary)
+                Text(title)
+                Spacer(minLength: 8)
+                if let shortcut {
+                    Text(shortcut)
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .frame(maxWidth: .infinity, alignment: .leading)   // full-width hover + click target
+            .contentShape(Rectangle())
+            .background(hovering ? Color.primary.opacity(0.08) : .clear,
+                        in: RoundedRectangle(cornerRadius: 6))
+        }
         .buttonStyle(.plain)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .onHover { hovering = $0 }
     }
 }
 
