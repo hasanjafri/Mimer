@@ -106,6 +106,13 @@ final class DebugBridge {
 
         // Deterministic standalone renders (always available, permission-free).
         write(renderPNG(MenuBarView(), width: 320), "render-menu.png")
+        // Copy-feedback states (hover + "Copied" badge) — transient at runtime, so
+        // seed them explicitly here for the self-test loop to inspect.
+        let menuItems = ClipStore.shared.items
+        write(renderPNG(
+            MenuBarView(debugCopiedID: menuItems.first?.id,
+                        debugHoverID: menuItems.count > 1 ? menuItems[1].id : nil),
+            width: 320), "render-menu-feedback.png")
         write(renderPNG(PaletteView(onPaste: { _ in }, onClose: {}), width: 640), "render-palette.png")
         write(renderPNG(OnboardingView(onDone: {}), width: 440), "render-onboarding.png")
 

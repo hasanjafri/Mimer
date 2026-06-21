@@ -7,7 +7,28 @@ struct MenuBarView: View {
     @ObservedObject private var store = ClipStore.shared
     @ObservedObject private var prefs = Preferences.shared
 
+    @State private var hoverID: UUID?
+    @State private var copiedID: UUID?
+
     private let rowHeight: CGFloat = 30
+
+    #if DEBUG
+    private let debugFlatList: Bool
+
+    init() { debugFlatList = false }
+
+    /// Snapshot-only: seed the transient hover/copied row states and drop the
+    /// ScrollView (which ImageRenderer can't lay out) so the self-test loop can
+    /// render the copy-feedback affordances, otherwise only reachable with a live
+    /// mouse. Never used by the running app.
+    init(debugCopiedID: UUID?, debugHoverID: UUID? = nil) {
+        _copiedID = State(initialValue: debugCopiedID)
+        _hoverID = State(initialValue: debugHoverID)
+        debugFlatList = true
+    }
+    #else
+    init() {}
+    #endif
 
     private var listHeight: CGFloat {
         let screenCap = (NSScreen.main?.visibleFrame.height ?? 800) - 160
@@ -37,15 +58,11 @@ struct MenuBarView: View {
                     .padding(12)
                     .frame(maxWidth: .infinity, alignment: .leading)
             } else {
-                ScrollView {
-                    LazyVStack(spacing: 1) {
-                        ForEach(Array(store.items.enumerated()), id: \.element.id) { index, item in
-                            row(index: index, item: item)
-                        }
-                    }
-                    .padding(.vertical, 4)
-                }
-                .frame(height: listHeight)
+                #if DEBUG
+                if debugFlatList { debugFlatClipList } else { clipList }
+                #else
+                clipList
+                #endif
             }
 
             Divider()
@@ -53,6 +70,32 @@ struct MenuBarView: View {
         }
         .frame(width: 320)
     }
+
+    private var clipList: some View {
+        ScrollView {
+            LazyVStack(spacing: 1) {
+                ForEach(Array(store.items.enumerated()), id: \.element.id) { index, item in
+                    row(index: index, item: item)
+                }
+            }
+            .padding(.horizontal, 6)
+            .padding(.vertical, 4)
+        }
+        .frame(height: listHeight)
+    }
+
+    #if DEBUG
+    /// Non-scrolling render of the first rows, for the snapshot harness only.
+    private var debugFlatClipList: some View {
+        VStack(spacing: 1) {
+            ForEach(Array(store.items.prefix(6).enumerated()), id: \.element.id) { index, item in
+                row(index: index, item: item)
+            }
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 4)
+    }
+    #endif
 
     private var header: some View {
         HStack(spacing: 6) {
@@ -68,7 +111,9 @@ struct MenuBarView: View {
     }
 
     private func row(index: Int, item: ClipItem) -> some View {
-        HStack(spacing: 8) {
+        let isCopied = copiedID == item.id
+        let isHovered = hoverID == item.id
+        return HStack(spacing: 8) {
             Text("\(index + 1)")
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(.tertiary)
@@ -76,19 +121,45 @@ struct MenuBarView: View {
             KindIcon(kind: item.kind, text: item.text)
             Text(item.text).lineLimit(1).truncationMode(.middle)
             Spacer(minLength: 0)
-            Button {
-                store.toggleFavorite(item.id)
-            } label: {
-                Image(systemName: item.isFavorite ? "star.fill" : "star")
+            if isCopied {
+                Label("Copied", systemImage: "checkmark.circle.fill")
+                    .labelStyle(.titleAndIcon)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.green)
+                    .transition(.opacity)
+            } else {
+                Button {
+                    store.toggleFavorite(item.id)
+                } label: {
+                    Image(systemName: item.isFavorite ? "star.fill" : "star")
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(item.isFavorite ? AnyShapeStyle(Color.yellow) : AnyShapeStyle(.tertiary))
+                .help(item.isFavorite ? "Unfavorite" : "Favorite (kept forever)")
             }
-            .buttonStyle(.plain)
-            .foregroundStyle(item.isFavorite ? AnyShapeStyle(Color.yellow) : AnyShapeStyle(.tertiary))
-            .help(item.isFavorite ? "Unfavorite" : "Favorite (kept forever)")
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
+        .background(
+            isCopied ? Color.green.opacity(0.18)
+                     : (isHovered ? Color.primary.opacity(0.08) : .clear),
+            in: RoundedRectangle(cornerRadius: 6)
+        )
         .contentShape(Rectangle())
-        .onTapGesture { Paster.copyToPasteboard(item.text) }
+        .onHover { hovering in hoverID = hovering ? item.id : (hoverID == item.id ? nil : hoverID) }
+        .onTapGesture { copy(item) }
+        .help("Click to copy to the clipboard")
+    }
+
+    /// Copy a clip and flash an inline "Copied" confirmation on its row — the
+    /// menu-bar window stays open, so this is the only signal the click landed.
+    private func copy(_ item: ClipItem) {
+        Paster.copyToPasteboard(item.text)
+        let id = item.id
+        withAnimation(.easeOut(duration: 0.15)) { copiedID = id }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+            if copiedID == id { withAnimation(.easeOut(duration: 0.25)) { copiedID = nil } }
+        }
     }
 
     private var actions: some View {
