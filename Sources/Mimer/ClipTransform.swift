@@ -44,7 +44,13 @@ struct ClipTransform: Identifiable {
         ClipTransform(id: "urlstrip", name: "Strip tracking params", systemImage: "scissors") { stripTrackingParams($0) },
         ClipTransform(id: "urlquery", name: "Decode query string", systemImage: "list.bullet") { decodeQueryString($0) },
         ClipTransform(id: "epoch2iso", name: "Unix time → ISO 8601", systemImage: "clock") { unixToISO($0) },
-        ClipTransform(id: "iso2epoch", name: "ISO 8601 → Unix time", systemImage: "clock.arrow.circlepath") { isoToUnix($0) }
+        ClipTransform(id: "iso2epoch", name: "ISO 8601 → Unix time", systemImage: "clock.arrow.circlepath") { isoToUnix($0) },
+        ClipTransform(id: "json2ts", name: "JSON → TypeScript", systemImage: "curlybraces.square") { jsonToTypeScript($0) },
+        ClipTransform(id: "sortlines", name: "Sort lines A→Z", systemImage: "arrow.up.arrow.down") { sortLines($0) },
+        ClipTransform(id: "dedupelines", name: "Dedupe lines", systemImage: "line.3.horizontal.decrease") { dedupeLines($0) },
+        ClipTransform(id: "reverselines", name: "Reverse lines", systemImage: "arrow.uturn.up") { reverseLines($0) },
+        ClipTransform(id: "camel", name: "camelCase", systemImage: "textformat.abc") { camelCase($0) },
+        ClipTransform(id: "snake", name: "snake_case", systemImage: "textformat.abc") { snakeCase($0) }
     ]
 
     // MARK: - Helpers
@@ -166,5 +172,96 @@ struct ClipTransform: Identifiable {
         fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         guard let date = plain.date(from: t) ?? fractional.date(from: t) else { return nil }
         return String(Int(date.timeIntervalSince1970))
+    }
+
+    // MARK: - Structure transforms
+
+    /// Generate a TypeScript `interface Root { … }` from a top-level JSON object (nested
+    /// objects inline). Returns nil for non-object JSON or non-JSON, so it stays hidden.
+    private static func jsonToTypeScript(_ s: String) -> String? {
+        guard let obj = try? JSONSerialization.jsonObject(with: Data(s.utf8)) as? [String: Any] else { return nil }
+        return "interface Root " + tsObject(obj, indent: 0)
+    }
+
+    private static func tsObject(_ obj: [String: Any], indent: Int) -> String {
+        guard !obj.isEmpty else { return "{}" }
+        let pad = String(repeating: "  ", count: indent + 1)
+        let close = String(repeating: "  ", count: indent)
+        let body = obj.keys.sorted().map { key -> String in
+            let k = isTSIdentifier(key) ? key : "\"\(key)\""
+            return "\(pad)\(k): \(tsType(obj[key]!, indent: indent + 1));"
+        }.joined(separator: "\n")
+        return "{\n\(body)\n\(close)}"
+    }
+
+    private static func tsType(_ value: Any, indent: Int) -> String {
+        if value is NSNull { return "null" }
+        if let n = value as? NSNumber { return CFGetTypeID(n) == CFBooleanGetTypeID() ? "boolean" : "number" }
+        if value is String { return "string" }
+        if let arr = value as? [Any] { return (arr.first.map { tsType($0, indent: indent) } ?? "any") + "[]" }
+        if let obj = value as? [String: Any] { return tsObject(obj, indent: indent) }
+        return "any"
+    }
+
+    private static func isTSIdentifier(_ s: String) -> Bool {
+        s.range(of: #"^[A-Za-z_$][A-Za-z0-9_$]*$"#, options: .regularExpression) != nil
+    }
+
+    // MARK: - Line transforms (multi-line only, so they stay hidden for single-line clips)
+
+    private static func sortLines(_ s: String) -> String? {
+        let lines = s.components(separatedBy: "\n")
+        guard lines.count >= 2 else { return nil }
+        return lines.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }.joined(separator: "\n")
+    }
+
+    private static func dedupeLines(_ s: String) -> String? {
+        let lines = s.components(separatedBy: "\n")
+        guard lines.count >= 2 else { return nil }
+        var seen = Set<String>()
+        return lines.filter { seen.insert($0).inserted }.joined(separator: "\n")   // applicable() hides if no dups
+    }
+
+    private static func reverseLines(_ s: String) -> String? {
+        let lines = s.components(separatedBy: "\n")
+        guard lines.count >= 2 else { return nil }
+        return lines.reversed().joined(separator: "\n")
+    }
+
+    // MARK: - Case transforms (identifier-like phrases only, so they stay off prose)
+
+    /// Split an identifier-ish phrase into words on separators AND camelCase boundaries.
+    /// nil (→ transform hidden) unless it's a short single line of letters/digits/`_-` + spaces.
+    private static func identifierWords(_ s: String) -> [String]? {
+        let t = s.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !t.isEmpty, !t.contains("\n"), t.count <= 60,
+              t.allSatisfy({ $0.isLetter || $0.isNumber || $0 == " " || $0 == "_" || $0 == "-" }) else { return nil }
+        var words: [String] = []
+        var cur = ""
+        var prevCased = false   // previous char was a lowercase letter or digit
+        for ch in t {
+            if ch == " " || ch == "_" || ch == "-" {
+                if !cur.isEmpty { words.append(cur); cur = "" }
+                prevCased = false
+            } else {
+                if ch.isUppercase, prevCased { words.append(cur); cur = "" }   // camelCase boundary
+                cur.append(ch)
+                prevCased = ch.isLowercase || ch.isNumber
+            }
+        }
+        if !cur.isEmpty { words.append(cur) }
+        return words.isEmpty ? nil : words
+    }
+
+    private static func camelCase(_ s: String) -> String? {
+        guard let w = identifierWords(s) else { return nil }
+        let head = w[0].lowercased()
+        let tail = w.dropFirst().map { $0.prefix(1).uppercased() + $0.dropFirst().lowercased() }
+        return ([head] + tail).joined()
+    }
+
+    private static func snakeCase(_ s: String) -> String? {
+        guard let w = identifierWords(s) else { return nil }
+        return w.map { $0.lowercased() }.joined(separator: "_")
     }
 }

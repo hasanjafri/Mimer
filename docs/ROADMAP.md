@@ -39,9 +39,10 @@ Lead with the wedge (pure-logic, no data-model/concurrency deps); keep encryptio
 images; concurrency machinery sits just before the image/OCR work that needs it.
 
 1. **Transform engine v2 + paste-as-plain (`⌥⏎`).** *In progress.* Shipped: developer
-   transforms — Decode JWT, Strip tracking params, Decode query string, Unix↔ISO 8601
-   (pure, gated, unit-tested). Next in this bucket: JSON→TypeScript/Go, diff two clips,
-   transform chains, apply-and-paste-without-mutating-clipboard, and paste-as-plain.
+   transforms — Decode JWT, Strip tracking params, Decode query string, Unix↔ISO 8601,
+   **JSON → TypeScript**, **sort/dedupe/reverse lines**, **camelCase/snake_case** (all pure,
+   gated, unit-tested). Next in this bucket: JSON→Go/Swift, diff two clips, transform chains,
+   apply-and-paste-without-mutating-clipboard, and paste-as-plain (needs rich types first).
 2. **Developer-domain awareness** (git-SHA / issue-key / stack-trace `file:line` /
    secret detection). *In progress.* Shipped: **secret detection** (`SecretDetector`) —
    detected API keys/tokens/PEM/secret-env are **masked** in the list (not skipped: Mimer

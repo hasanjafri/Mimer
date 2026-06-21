@@ -83,4 +83,37 @@ final class ClipTransformTests: XCTestCase {
         XCTAssertEqual(transform("iso2epoch").apply("2018-01-18T01:30:22.123Z"), "1516239022")  // fractional seconds
         XCTAssertNil(transform("iso2epoch").apply("not a date"))
     }
+
+    func testJSONToTypeScript() {
+        let out = transform("json2ts").apply("{\"name\":\"Bob\",\"age\":30,\"admin\":true,\"tags\":[\"a\"],\"meta\":{\"x\":1}}")
+        XCTAssertNotNil(out)
+        XCTAssertTrue(out!.hasPrefix("interface Root {"))
+        XCTAssertTrue(out!.contains("name: string;"))
+        XCTAssertTrue(out!.contains("age: number;"))
+        XCTAssertTrue(out!.contains("admin: boolean;"))   // bool not number
+        XCTAssertTrue(out!.contains("tags: string[];"))
+        XCTAssertTrue(out!.contains("meta: {"))           // nested object inlined
+        XCTAssertNil(transform("json2ts").apply("[1,2,3]"))        // top-level array → not an interface
+        XCTAssertNil(transform("json2ts").apply("just prose"))
+    }
+
+    func testLineOps() {
+        XCTAssertEqual(transform("sortlines").apply("banana\napple\ncherry"), "apple\nbanana\ncherry")
+        XCTAssertEqual(transform("dedupelines").apply("a\nb\na\nc\nb"), "a\nb\nc")
+        XCTAssertEqual(transform("reverselines").apply("1\n2\n3"), "3\n2\n1")
+        XCTAssertNil(transform("sortlines").apply("single line"))           // single line → hidden
+        XCTAssertNil(transform("reverselines").apply("single line"))
+        // dedupe with no duplicates is hidden by applicable() (output == input)
+        XCTAssertFalse(ClipTransform.applicable(to: "a\nb\nc").contains { $0.id == "dedupelines" })
+        XCTAssertTrue(ClipTransform.applicable(to: "a\nb\na").contains { $0.id == "dedupelines" })
+    }
+
+    func testCaseConversions() {
+        XCTAssertEqual(transform("camel").apply("user name"), "userName")
+        XCTAssertEqual(transform("camel").apply("user_profile_id"), "userProfileId")
+        XCTAssertEqual(transform("snake").apply("userName"), "user_name")          // camelCase boundary split
+        XCTAssertEqual(transform("snake").apply("User Profile ID"), "user_profile_id")
+        XCTAssertNil(transform("camel").apply("This is a full sentence, with punctuation."))  // prose → hidden
+        XCTAssertNil(transform("snake").apply("multi\nline"))                       // not a single identifier-ish line
+    }
 }

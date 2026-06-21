@@ -40,8 +40,9 @@ one-keystroke transforms — all local-first, no subscription, MIT-licensed.
 - **Type-aware clips** — links, code, colors, **git SHAs, issue keys (`ABC-123`), and file paths / stack-trace `file:line`** each get their own glyph; hex colors show a live swatch.
 - **⌘O — act on a clip** — context-aware, no setup: reveal a masked secret, open a link in your browser, or reveal a file path / `file:line` in Finder. (Opening commits/issues/editors lands in a later release.)
 - **⌘K transforms** — for the selected clip, each with a live preview and shown only when it applies:
-  - *General:* `UPPER`/`lower`/`Title`, trim, slugify, Base64 encode/decode, URL encode/decode, JSON pretty-print/minify.
-  - *Developer:* **Decode JWT**, **strip tracking params** from a URL, **decode a query string**, **Unix ↔ ISO 8601** timestamps — with more coming (JSON→type, diff two clips, chains).
+  - *General:* `UPPER`/`lower`/`Title`, `camelCase`/`snake_case`, trim, slugify, Base64 encode/decode, URL encode/decode, JSON pretty-print/minify.
+  - *Lists:* sort lines, dedupe lines, reverse lines.
+  - *Developer:* **JSON → TypeScript**, **Decode JWT**, **strip tracking params** from a URL, **decode a query string**, **Unix ↔ ISO 8601** timestamps — with more coming (diff two clips, chains, paste-as-plain).
 - **Favorites** — ⌘D (or the ★) keeps a clip forever, pinned in its own section.
 - **Snippets** — author reusable text (signatures, boilerplate) that lives in the palette forever.
 - **Secret-aware** — detected API keys, tokens, and private keys are **masked** in the list (`AWS key ••••1234`, with a 🔒) so they're not on screen during a screenshare. They're still stored locally and pasted in full — unlike cloud tools, Mimer doesn't drop your secrets, it just hides them from view. Toggle in Privacy settings.
