@@ -37,8 +37,12 @@ final class PersistenceController {
         let fileSynced = fsync(fd) == 0
         close(fd)
         guard fileSynced else { NSLog("Mimer: could not fsync vacuum marker"); return false }
+        // The new directory entry must be durable too — fail if we can't confirm it.
         let dirFd = open(url.deletingLastPathComponent().path, O_RDONLY)
-        if dirFd >= 0 { _ = fsync(dirFd); close(dirFd) }   // make the new dir entry durable too
+        guard dirFd >= 0 else { NSLog("Mimer: could not open store dir to fsync marker entry"); return false }
+        let dirSynced = fsync(dirFd) == 0
+        close(dirFd)
+        guard dirSynced else { NSLog("Mimer: could not fsync store dir for marker entry"); return false }
         return true
     }
 
