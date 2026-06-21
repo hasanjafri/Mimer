@@ -94,8 +94,12 @@ Typical loop: edit → `xcodebuild build` → relaunch the Debug app → drive v
   they apply): Decode JWT, Strip tracking params, Decode query string, Unix↔ISO 8601.
   `applicable(to:)` hides no-ops/inapplicable. This is the wedge — extend here per
   `docs/ROADMAP.md` (JSON→type, diff two clips, chains, paste-as-plain next).
+- `SearchQuery` — parses the palette search box into composable filters: `type:<kind>`
+  (link/code/color/sha/issue/file/snippet/image), `type:secret`/`is:secret` (live detection,
+  works on old clips), `is:fav`, and `/regex/` (case-insensitive; invalid → literal fuzzy) —
+  the leftover text stays a fuzzy match. Pure + testable; plain queries behave as before.
 - `CommandPalettePanel` (nonactivating `NSPanel`, `canBecomeKey`) + `PaletteView` — the
-  palette: search + ⌘K transform mode (search field stays mounted to keep focus).
+  palette: search (+ `SearchQuery` filters) + ⌘K transform mode (search field stays mounted to keep focus).
   Keys: **⇧⌘V** toggle · ↑↓ · ⏎ paste · ⌘1-9 quick · ⌘K transform · **⌘O** act
   (context-aware, see `ClipAction`) · ⌘D favorite · **⌘⌫** delete · esc. The footer shows
   the ⌘O verb for the selected clip; revealed secrets re-mask when the palette closes.
@@ -150,6 +154,7 @@ filters as hygiene; defer OCR. Full sequenced plan + risks + design invariants i
 
 Shipped since 0.2.1 (unreleased on `main`): **secret detection + masking** (`SecretDetector`),
 **encrypt history at rest** (`Cryptor`, AES-GCM + Keychain key, lazy migration + vacuum), and
-**developer-domain awareness** (type detection + ⌘O config-free act-on via `ClipAction`).
-Next in flight: the configurable act-on integrations (open commit/issue/editor, Settings →
-Developer), then scoped/regex search + paste-stack.
+**developer-domain awareness** (type detection + ⌘O config-free act-on via `ClipAction`), and
+**scoped/regex search** (`SearchQuery` — `type:`/`is:`/`/regex/`). Next in flight: paste-stack
+and `app:` scoping, plus the configurable act-on integrations (open commit/issue/editor,
+Settings → Developer).

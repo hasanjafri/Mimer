@@ -28,9 +28,9 @@ struct PaletteView: View {
     @State private var revealedSecrets: Set<UUID> = []
 
     private var results: [ClipItem] {
-        let snips = query.isEmpty ? store.snippets : store.snippets.filter { fuzzyMatch(query, $0.text) }
-        let hist = query.isEmpty ? store.items : store.items.filter { fuzzyMatch(query, $0.text) }
-        return snips + hist
+        let q = SearchQuery.parse(query)
+        if q.isEmpty { return store.snippets + store.items }
+        return store.snippets.filter(q.matches) + store.items.filter(q.matches)
     }
 
     private var transforms: [ClipTransform] {
@@ -165,6 +165,10 @@ struct PaletteView: View {
             Text(store.items.isEmpty ? "No clips yet" : "No matches").font(.headline)
             Text(store.items.isEmpty ? "Copy some text and it appears here." : "Try a different search.")
                 .font(.callout).foregroundStyle(.secondary)
+            if !store.items.isEmpty {
+                Text("Filters: type:link · type:secret · is:fav · /regex/")
+                    .font(.caption2.monospaced()).foregroundStyle(.tertiary)
+            }
             Spacer()
         }
         .frame(maxWidth: .infinity)
