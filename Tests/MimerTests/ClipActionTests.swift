@@ -33,6 +33,19 @@ final class ClipActionTests: XCTestCase {
         XCTAssertNil(ClipAction.of("9f2a1c7"))   // no config → no action (SHA isn't a link/file)
     }
 
+    func testCommitURLNormalization() {
+        func commit(_ base: String) -> String? {
+            if case .open(let u, _)? = ClipAction.of("9f2a1c7", config: ClipAction.DevConfig(gitRemoteBase: base)) {
+                return u.absoluteString
+            }
+            return nil
+        }
+        XCTAssertEqual(commit("git@github.com:acme/app.git"), "https://github.com/acme/app/commit/9f2a1c7")  // scp SSH
+        XCTAssertEqual(commit("https://github.com/acme/app/"), "https://github.com/acme/app/commit/9f2a1c7")  // trailing slash
+        XCTAssertNil(commit("https://github.com/acme/app?x=1"))   // query would distort the path → rejected
+        XCTAssertNil(commit("https://user@github.com/acme/app"))  // userinfo → rejected
+    }
+
     func testIssueKeyOpensTrackerWhenConfigured() {
         let cfg = ClipAction.DevConfig(issueTrackerTemplate: "https://acme.atlassian.net/browse/{KEY}")
         if case .open(let u, "open issue")? = ClipAction.of("ABC-1234", config: cfg) {
@@ -56,8 +69,10 @@ final class ClipActionTests: XCTestCase {
             XCTAssertTrue(u.absoluteString.hasSuffix(":42:7"))
             XCTAssertTrue(u.absoluteString.contains("Main.swift"))
         } else { XCTFail("file:line should open in the editor when configured") }
-        // No editor configured → falls back to Finder reveal.
-        if case .revealInFinder? = ClipAction.of(file.path) {} else { XCTFail("no editor → Finder reveal") }
+        // A PLAIN file path (no line) reveals in Finder even with an editor configured.
+        if case .revealInFinder? = ClipAction.of(file.path, config: cfg) {} else { XCTFail("plain path → Finder even with editor") }
+        // No editor configured → Finder reveal.
+        if case .revealInFinder? = ClipAction.of(file.path + ":42") {} else { XCTFail("no editor → Finder reveal") }
     }
 
     func testRevealsExistingFileStrippingLineCol() {

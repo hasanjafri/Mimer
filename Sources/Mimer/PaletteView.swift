@@ -436,7 +436,12 @@ struct PaletteView: View {
             if revealedSecrets.contains(item.id) { revealedSecrets.remove(item.id) }
             else { revealedSecrets.insert(item.id) }
         case .open(let url, _):
-            NSWorkspace.shared.open(url)
+            // Defense-in-depth: only ever open a known-safe scheme, even though every
+            // ClipAction constructor already validates (http/https links, vscode/cursor editor).
+            let allowed: Set<String> = ["http", "https", "vscode", "cursor"]
+            if let scheme = url.scheme?.lowercased(), allowed.contains(scheme) {
+                NSWorkspace.shared.open(url)
+            }
             onClose()
         case .revealInFinder(let url):
             NSWorkspace.shared.activateFileViewerSelecting([url])

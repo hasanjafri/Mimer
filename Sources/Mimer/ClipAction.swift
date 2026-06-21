@@ -50,7 +50,11 @@ enum ClipAction: Equatable {
         // Config-free: web links never contain raw spaces; file paths can.
         if !t.contains(" "), let url = httpURL(t) { return .open(url, label: "open link") }
         if let ref = parseFileRef(t) {
-            if let editor = config.editor, let u = editorURL(editor, ref) { return .open(u, label: "open in editor") }
+            // Editor only for a stack-trace `file:line` (a code location to jump to); a plain
+            // file path always reveals in Finder, so configuring an editor never hijacks it.
+            if let editor = config.editor, ref.line != nil, let u = editorURL(editor, ref) {
+                return .open(u, label: "open in editor")
+            }
             return .revealInFinder(URL(fileURLWithPath: ref.path))
         }
         return nil
@@ -64,16 +68,27 @@ enum ClipAction: Equatable {
         return url
     }
 
-    /// `{remoteBase}/commit/{sha}` as an https URL. Accepts a bare host/path or a full URL;
-    /// strips a trailing slash and `.git`. (GitHub/GitLab use /commit/<sha>.)
+    /// `{remoteBase}/commit/{sha}` as an https URL. Accepts a bare host/path, a full https URL,
+    /// or an scp-style SSH remote (`git@github.com:org/repo.git`). Parsed via URLComponents and
+    /// rejected if it carries userinfo/query/fragment (which would distort the appended path).
     private static func commitURL(_ base: String, sha: String) -> URL? {
         var b = base.trimmingCharacters(in: .whitespaces)
+        // scp-style SSH (git@host:org/repo[.git]) → https://host/org/repo
+        if !b.lowercased().hasPrefix("http"), let at = b.firstIndex(of: "@") {
+            let afterAt = b[b.index(after: at)...]
+            if let colon = afterAt.firstIndex(of: ":") {
+                b = "https://\(afterAt[..<colon])/\(afterAt[afterAt.index(after: colon)...])"
+            }
+        }
         if !b.lowercased().hasPrefix("http") { b = "https://" + b }
-        while b.hasSuffix("/") { b.removeLast() }
-        if b.hasSuffix(".git") { b.removeLast(4) }
-        guard let u = URL(string: b + "/commit/" + sha),
-              let s = u.scheme?.lowercased(), s == "http" || s == "https", u.host?.isEmpty == false else { return nil }
-        return u
+        guard var c = URLComponents(string: b), let scheme = c.scheme?.lowercased(),
+              scheme == "http" || scheme == "https", let host = c.host, !host.isEmpty,
+              c.user == nil, c.password == nil, c.query == nil, c.fragment == nil else { return nil }
+        var path = c.path
+        while path.hasSuffix("/") { path.removeLast() }
+        if path.hasSuffix(".git") { path.removeLast(4) }
+        c.path = path + "/commit/" + sha
+        return c.url
     }
 
     /// Substitute `{KEY}` in the tracker template; require an http/https result.
@@ -85,10 +100,17 @@ enum ClipAction: Equatable {
         return u
     }
 
-    /// `vscode://file/{absPath}:{line}:{col}` (or cursor://). The path is percent-encoded so
-    /// spaces are valid in the URL.
+    /// `vscode://file/{absPath}:{line}:{col}` (or cursor://). The path is strictly percent-
+    /// encoded (only unreserved + `/` kept, so `:`/`%`/`?`/`#`/space can't create delimiter
+    /// ambiguity); the trailing `:line:col` we append are our own digits.
+    private static let editorPathAllowed: CharacterSet = {
+        var set = CharacterSet.alphanumerics
+        set.insert(charactersIn: "/-._~")
+        return set
+    }()
+
     private static func editorURL(_ editor: DevConfig.Editor, _ ref: FileRef) -> URL? {
-        let encoded = ref.path.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? ref.path
+        guard let encoded = ref.path.addingPercentEncoding(withAllowedCharacters: editorPathAllowed) else { return nil }
         var s = "\(editor.scheme)://file\(encoded)"
         if let line = ref.line { s += ":\(line)"; if let col = ref.col { s += ":\(col)" } }
         return URL(string: s)

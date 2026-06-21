@@ -87,7 +87,7 @@ private struct DeveloperSettingsView: View {
             } header: {
                 Text("Editor")
             } footer: {
-                Text("⌘O on a file path or a stack-trace file:line opens it here; otherwise Finder reveals the file.")
+                Text("⌘O on a stack-trace file:line opens it here at the line. A plain file path always reveals in Finder.")
             }
         }
         .formStyle(.grouped)
