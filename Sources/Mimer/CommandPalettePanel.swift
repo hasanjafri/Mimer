@@ -50,10 +50,10 @@ final class PaletteController: NSObject {
         if isPaletteVisible { dismiss(paste: nil) } else { open() }
     }
 
-    func open(transformIndex: Int? = nil) {
+    func open(transformIndex: Int? = nil, stackIndices: [Int]? = nil) {
         guard !isPaletteVisible else { return }
         previousApp = NSWorkspace.shared.frontmostApplication
-        let panel = makePanel(transformIndex: transformIndex)   // fresh each open → field re-focuses + clean search
+        let panel = makePanel(transformIndex: transformIndex, stackIndices: stackIndices)   // fresh each open → field re-focuses + clean search
         self.panel = panel
         if let screen = NSScreen.main {
             let size = panel.frame.size
@@ -99,6 +99,36 @@ final class PaletteController: NSObject {
         dismiss(paste: items[index].text)
     }
 
+    /// Paste several clips in order into the prior app (the paste-stack). Each clip is placed
+    /// on the pasteboard and pasted, with a gap before the next so the target app keeps up.
+    func dismiss(pasteSequence items: [String]) {
+        guard !isDismissing else { return }
+        guard items.count > 1 else { dismiss(paste: items.first); return }   // 0/1 → normal path
+        isDismissing = true
+        panel?.delegate = nil
+        panel?.orderOut(nil)
+        panel = nil
+
+        if previousApp?.isTerminated == false { previousApp?.activate() }
+        guard Paster.canPostEvents else {
+            _ = Paster.copyToPasteboard(items[items.count - 1])   // best effort: leave the last on the clipboard
+            isDismissing = false
+            return
+        }
+        pasteNext(items, index: 0, initialDelay: 0.12)   // let the prior app focus first
+    }
+
+    private func pasteNext(_ items: [String], index: Int, initialDelay: TimeInterval = 0) {
+        guard index < items.count else { isDismissing = false; return }
+        _ = Paster.copyToPasteboard(items[index])
+        DispatchQueue.main.asyncAfter(deadline: .now() + initialDelay) { [weak self] in
+            _ = Paster.synthesizePaste()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {   // gap so the app processes each paste
+                self?.pasteNext(items, index: index + 1)
+            }
+        }
+    }
+
     // Introspection (used by the debug bridge).
     var isPaletteVisible: Bool { panel?.isVisible ?? false }
     var isPaletteKey: Bool { panel?.isKeyWindow ?? false }
@@ -107,13 +137,15 @@ final class PaletteController: NSObject {
         return String(describing: type(of: fr))
     }
 
-    private func makePanel(transformIndex: Int? = nil) -> CommandPalettePanel {
+    private func makePanel(transformIndex: Int? = nil, stackIndices: [Int]? = nil) -> CommandPalettePanel {
         let panel = CommandPalettePanel(contentRect: NSRect(x: 0, y: 0, width: 640, height: 440))
         panel.delegate = self
         let root = PaletteView(
             onPaste: { [weak self] text in self?.dismiss(paste: text) },
+            onPasteSequence: { [weak self] texts in self?.dismiss(pasteSequence: texts) },
             onClose: { [weak self] in self?.dismiss(paste: nil) },
-            initialTransformIndex: transformIndex
+            initialTransformIndex: transformIndex,
+            initialStackIndices: stackIndices
         )
         panel.contentView = NSHostingView(rootView: root)
         return panel

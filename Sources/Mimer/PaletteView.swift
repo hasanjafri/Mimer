@@ -1,16 +1,20 @@
 import SwiftUI
 
 /// Command palette: search + result list over the persistent clipboard history.
-/// Keyboard: ↑↓ move · ⏎ paste · ⌘1–9 quick · ⌘K transform · ⌘O act · ⌘D favorite · ⌫ delete · esc.
+/// Keyboard: ↑↓ move · ⏎ paste · ⇥ stack · ⇧⏎ paste stack · ⌘1–9 quick · ⌘K transform ·
+/// ⌘O act · ⌘D favorite · ⌫ delete · esc.
 /// ⌘O is the context-aware action for the selected clip (reveal a secret · open a link ·
-/// reveal a file in Finder) — see `ClipAction`.
+/// reveal a file in Finder) — see `ClipAction`. ⇥ toggles a clip in the paste-stack
+/// (`PasteStack`); ⇧⏎ pastes the whole stack in order.
 /// ⌘K opens transform mode for the selected clip (UPPER/lower, base64, JSON, …),
 /// with a live preview of each result. The search field stays mounted across modes
 /// so keyboard focus never drops.
 struct PaletteView: View {
     let onPaste: (String) -> Void
+    var onPasteSequence: ([String]) -> Void = { _ in }
     let onClose: () -> Void
     var initialTransformIndex: Int? = nil   // debug hook: open straight into transform mode
+    var initialStackIndices: [Int]? = nil   // debug hook: pre-seed the paste-stack for snapshots
 
     @ObservedObject private var store = ClipStore.shared
     @ObservedObject private var prefs = Preferences.shared
@@ -26,6 +30,9 @@ struct PaletteView: View {
     // Secrets temporarily revealed via ⌘O. The panel is recreated on each open, so this
     // resets to empty every time — revealed secrets re-mask once the palette closes.
     @State private var revealedSecrets: Set<UUID> = []
+
+    // Paste-stack (Tab toggles membership; ⇧⏎ pastes all in order). Resets per open.
+    @State private var stack = PasteStack()
 
     // Parsed once per query change (not per results access) so a /regex/ compiles only once.
     @State private var parsedQuery = SearchQuery()
@@ -53,10 +60,11 @@ struct PaletteView: View {
                 .font(.title2)
                 .padding(16)
                 .focused($searchFocused)
-                .onSubmit(commitSelection)
 
             if let target = transformTarget {
                 transformBar(target)
+            } else if !stack.isEmpty {
+                stackBar
             }
 
             Divider()
@@ -83,6 +91,9 @@ struct PaletteView: View {
             } else {
                 transformTarget = nil
             }
+            if let idxs = initialStackIndices {
+                for i in idxs where store.items.indices.contains(i) { stack.toggle(store.items[i].id) }
+            }
             DispatchQueue.main.async { searchFocused = true }
         }
         .onChange(of: query) {
@@ -93,9 +104,8 @@ struct PaletteView: View {
         .onChange(of: transformTarget?.id) { DispatchQueue.main.async { searchFocused = true } }   // keep keys alive across modes
         .onKeyPress(.downArrow) { moveSelection(1); return .handled }
         .onKeyPress(.upArrow) { moveSelection(-1); return .handled }
-        .onKeyPress(.return) { commitSelection(); return .handled }
         .onKeyPress(.escape) { escapeAction(); return .handled }
-        .onKeyPress(phases: .down) { handleCommandKey($0) }
+        .onKeyPress(phases: .down) { handleKey($0) }
     }
 
     // MARK: - Search results
@@ -144,6 +154,13 @@ struct PaletteView: View {
             }
             Text(showMasked ? masked! : item.text).lineLimit(1).truncationMode(.middle)
             Spacer(minLength: 0)
+            if let pos = stack.position(of: item.id) {
+                Text("\(pos)")
+                    .font(.caption2.bold().monospacedDigit())
+                    .foregroundStyle(.white)
+                    .frame(width: 16, height: 16)
+                    .background(Color.accentColor, in: Circle())
+            }
             if item.isFavorite {
                 Image(systemName: "star.fill").font(.caption).foregroundStyle(.yellow)
             }
@@ -161,6 +178,22 @@ struct PaletteView: View {
         )
         .contentShape(Rectangle())
         .onTapGesture { selection = index; pasteSelected() }
+    }
+
+    private var stackBar: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "square.stack.3d.up.fill").foregroundStyle(.blue)
+            Text("Stack \(stack.count)").foregroundStyle(.secondary)
+            Text(stack.ordered(from: store.snippets + store.items)
+                    .map { SecretDetector.maskedPreview($0.text) ?? $0.text }
+                    .joined(separator: " · "))
+                .lineLimit(1).truncationMode(.tail)
+            Spacer(minLength: 8)
+            Text("⇧⏎ paste all · tab add/remove · esc clear").foregroundStyle(.tertiary)
+        }
+        .font(.caption)
+        .padding(.horizontal, 16)
+        .padding(.bottom, 10)
     }
 
     private var emptyState: some View {
@@ -266,7 +299,7 @@ struct PaletteView: View {
 
     private var footerHint: String {
         if transformTarget != nil { return "↑↓ move · ⏎ apply · esc back" }
-        let base = "↑↓ move · ⏎ paste · ⌘K transform · ⌘D favorite · ⌘⌫ delete · esc"
+        let base = "↑↓ move · ⏎ paste · ⇥ stack · ⌘K transform · ⌘D favorite · ⌘⌫ delete · esc"
         if let action = selectedAction { return "⌘O \(action.label) · \(base)" }
         return base
     }
@@ -296,8 +329,38 @@ struct PaletteView: View {
         if transformTarget != nil {
             transformTarget = nil
             query = ""
+        } else if !stack.isEmpty {
+            stack.clear()        // first esc clears the paste-stack; next esc closes
         } else {
             onClose()
+        }
+    }
+
+    private func toggleStackForSelected() {
+        guard results.indices.contains(selection) else { return }
+        stack.toggle(results[selection].id)
+    }
+
+    private func pasteStack() {
+        let texts = stack.ordered(from: store.snippets + store.items).map(\.text)
+        guard !texts.isEmpty else { return }
+        onPasteSequence(texts)
+    }
+
+    private func handleKey(_ press: KeyPress) -> KeyPress.Result {
+        switch press.key {
+        case .return:
+            // ⇧⏎ pastes the stack (when one exists); ⏎ stays single-paste — never overloaded.
+            if transformTarget == nil, press.modifiers.contains(.shift), !stack.isEmpty {
+                pasteStack()
+            } else {
+                commitSelection()
+            }
+            return .handled
+        case .tab where transformTarget == nil:
+            toggleStackForSelected(); return .handled
+        default:
+            return handleCommandKey(press)
         }
     }
 
