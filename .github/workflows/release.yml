@@ -111,10 +111,11 @@ jobs:
           done < <(security list-keychains -d user)
           security default-keychain -s "$KC"
           security list-keychains -d user -s "$KC" "${EXISTING[@]}"
-          # Developer ID Application certificate + private key. -T limits key use to
-          # codesign (no broad -A "any app" grant).
+          # Developer ID Application certificate + private key. No -t (so the PKCS#12's
+          # cert AND private key both import — -t cert would drop the key); -T limits key
+          # use to codesign (no broad -A "any app" grant).
           echo "$CERT_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
-          security import "$RUNNER_TEMP/cert.p12" -P "$CERT_PASSWORD" -t cert -f pkcs12 -k "$KC" \
+          security import "$RUNNER_TEMP/cert.p12" -P "$CERT_PASSWORD" -f pkcs12 -k "$KC" \
             -T /usr/bin/codesign
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KC"
           rm -f "$RUNNER_TEMP/cert.p12"
