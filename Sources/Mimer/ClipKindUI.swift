@@ -10,6 +10,9 @@ extension ClipKind {
         case .image: return "photo"
         case .file: return "doc"
         case .snippet: return "note.text"
+        case .gitSHA: return "number"
+        case .issueKey: return "ticket"
+        case .fileRef: return "doc.text"
         }
     }
 
@@ -18,7 +21,9 @@ extension ClipKind {
         case .link: return .blue
         case .code: return .purple
         case .snippet: return .orange
-        case .file, .image: return .teal
+        case .file, .image, .fileRef: return .teal
+        case .gitSHA: return .brown
+        case .issueKey: return .pink
         default: return .secondary
         }
     }

@@ -77,7 +77,13 @@ Typical loop: edit → `xcodebuild build` → relaunch the Debug app → drive v
   migration. `secure_delete=ON` (freed cells are zeroed, not just marked reusable);
   `vacuum()` rebuilds the file + truncates the WAL to drop free-page plaintext after the
   encryption migration.
-- `Clip` / `ClipKind` — `detect()` classifies link / code / hex-color / text (conservative).
+- `Clip` / `ClipKind` — `detect()` classifies link / code / hex-color / text + developer
+  tokens (git SHA / issue key `ABC-123` / file ref incl. stack-trace `path:line:col`), all
+  conservative. Drives the row icon (`ClipKindUI`) on new captures.
+- `ClipAction` — the **live** "act on this clip" (⌘O), derived from text (not stored kind, so
+  it works on old clips too): reveal a masked secret · open an http/https link · reveal an
+  existing file path in Finder. Config-free only; open-commit/issue/editor (needs a remote/
+  tracker/editor) is deferred. Side-effect-light + user-initiated (never executes anything).
 - `SecretDetector` — pure, high-precision detection of secrets (API keys, tokens, PEM
   private keys, secret env assignments). Used to **mask** secrets in the list (lock glyph +
   `AWS key ••••1234`), NOT to skip them — Mimer is local/no-cloud and devs re-paste secrets
@@ -90,8 +96,9 @@ Typical loop: edit → `xcodebuild build` → relaunch the Debug app → drive v
   `docs/ROADMAP.md` (JSON→type, diff two clips, chains, paste-as-plain next).
 - `CommandPalettePanel` (nonactivating `NSPanel`, `canBecomeKey`) + `PaletteView` — the
   palette: search + ⌘K transform mode (search field stays mounted to keep focus).
-  Keys: **⇧⌘V** toggle · ↑↓ · ⏎ paste · ⌘1-9 quick · ⌘K transform · ⌘D favorite ·
-  **⌘⌫** delete · esc.
+  Keys: **⇧⌘V** toggle · ↑↓ · ⏎ paste · ⌘1-9 quick · ⌘K transform · **⌘O** act
+  (context-aware, see `ClipAction`) · ⌘D favorite · **⌘⌫** delete · esc. The footer shows
+  the ⌘O verb for the selected clip; revealed secrets re-mask when the palette closes.
 - `MenuBarView` / `MenuBarLabel` — dropdown + the capture pulse (icon bounce + checkmark)
   and paused dimming.
 - `Onboarding*`, `Settings*` (General / Privacy / About), `SnippetComposer*`,
@@ -141,7 +148,8 @@ the transform engine + developer-domain awareness + provable privacy; ship image
 filters as hygiene; defer OCR. Full sequenced plan + risks + design invariants in
 **`docs/ROADMAP.md`**. (Tap version/sha bump is now automated by the release Action.)
 
-Shipped since 0.2.1 (unreleased on `main`): **secret detection + masking** (`SecretDetector`)
-and **encrypt history at rest** (`Cryptor`, AES-GCM + Keychain key, lazy migration + vacuum).
-Next in flight: finish developer-domain awareness (reveal-on-demand, git-SHA / issue-key /
-stack-trace detection), then scoped/regex search + paste-stack.
+Shipped since 0.2.1 (unreleased on `main`): **secret detection + masking** (`SecretDetector`),
+**encrypt history at rest** (`Cryptor`, AES-GCM + Keychain key, lazy migration + vacuum), and
+**developer-domain awareness** (type detection + ⌘O config-free act-on via `ClipAction`).
+Next in flight: the configurable act-on integrations (open commit/issue/editor, Settings →
+Developer), then scoped/regex search + paste-stack.

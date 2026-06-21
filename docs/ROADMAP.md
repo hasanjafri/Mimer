@@ -46,8 +46,12 @@ images; concurrency machinery sits just before the image/OCR work that needs it.
    secret detection). *In progress.* Shipped: **secret detection** (`SecretDetector`) —
    detected API keys/tokens/PEM/secret-env are **masked** in the list (not skipped: Mimer
    is local/no-cloud and devs re-paste secrets, so the full value is stored + pasted, only
-   the display is masked; toggle in Privacy). Next: reveal-on-demand, and git-SHA /
-   issue-key / stack-trace `file:line` detection + "act on" links.
+   the display is masked; toggle in Privacy). Also shipped: **type detection** (git SHA /
+   issue key `ABC-123` / file ref incl. stack-trace `path:line:col`) with row icons, and a
+   config-free **⌘O "act on"** (`ClipAction`): reveal-on-demand for secrets · open http/https
+   links · reveal an existing file path in Finder — all derived live from text so old clips
+   work too. Deferred (needs config): open commit on a remote · open issue in a tracker ·
+   open `file:line` in an editor — a later PR with a Settings → Developer pane.
 3. **Scoped/regex search + paste-stack** (`type:`/`app:`/`/regex/`; queue visibly ordered,
    `⏎` never overloaded).
 4. **Encrypt at rest** — *shipped (text).* `Cryptor` does **app-layer** AES-GCM on the
