@@ -13,14 +13,26 @@ final class PersistenceController {
     private let storeFileURL: URL?
 
     /// Crash-safe "an encryption migration rewrote rows; their freed plaintext still
-    /// needs scrubbing" marker. Persisted (UserDefaults, keyed by store path so tests
-    /// and the real store don't collide) so a crash between the migration save and the
-    /// vacuum still triggers the scrub on the next launch. No-op for in-memory stores.
+    /// needs scrubbing" marker. Backed by a sidecar file next to the store (not
+    /// UserDefaults, which buffers in memory and isn't ordered with the Core Data save).
+    /// Setting it true writes + fsyncs the file, so once the migration save is durable the
+    /// marker is too — a crash before the vacuum still triggers the scrub next launch.
+    /// Per-store (keyed by path) so tests and the real store don't collide; no-op in-memory.
+    private var vacuumMarkerURL: URL? { storeFileURL?.appendingPathExtension("vacuum-pending") }
+
     var vacuumPending: Bool {
-        get { storeFileURL.map { UserDefaults.standard.bool(forKey: Self.vacuumKey($0)) } ?? false }
-        set { storeFileURL.map { UserDefaults.standard.set(newValue, forKey: Self.vacuumKey($0)) } }
+        get { vacuumMarkerURL.map { FileManager.default.fileExists(atPath: $0.path) } ?? false }
+        set {
+            guard let url = vacuumMarkerURL else { return }
+            if newValue {
+                let fd = open(url.path, O_WRONLY | O_CREAT | O_TRUNC, 0o600)
+                if fd >= 0 { _ = fsync(fd); close(fd) }   // durable + ordered before the save
+                else { NSLog("Mimer: could not write vacuum marker at \(url.path)") }
+            } else {
+                try? FileManager.default.removeItem(at: url)
+            }
+        }
     }
-    private static func vacuumKey(_ url: URL) -> String { "MimerVacuumPending:" + url.path }
 
     init(inMemory: Bool = false, storeURL: URL? = nil) {
         container = NSPersistentContainer(name: "Mimer", managedObjectModel: PersistenceController.model)
