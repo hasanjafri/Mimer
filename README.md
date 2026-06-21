@@ -67,7 +67,17 @@ opt-in and uses macOS's post-event permission (not Accessibility).
 
 ## Install
 
-**Build from source** (for now):
+**Download** (signed + notarized): grab the latest `Mimer-x.y.z.dmg` from
+[Releases](https://github.com/hasanjafri/Mimer/releases/latest), open it, and drag
+Mimer to Applications. Requires macOS 14+.
+
+**Homebrew:**
+
+```sh
+brew install --cask hasanjafri/tap/mimer   # once the tap is published
+```
+
+**Build from source:**
 
 ```sh
 brew install xcodegen          # one-time
@@ -79,9 +89,6 @@ xcodebuild -scheme Mimer -configuration Release build
 ```
 
 Requires macOS 14+ and the Xcode command-line tools.
-
-A Homebrew cask (`brew install --cask mimer`) and a notarized direct download
-land with the first release.
 
 ## Tech
 
