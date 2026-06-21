@@ -7,6 +7,14 @@
         <!-- Release <item>s are generated + signed by Sparkle's generate_appcast at
          release time (run by scripts/release.sh); commit the updated file. -->
         <item>
+            <title>0.2.1</title>
+            <pubDate>Sun, 21 Jun 2026 05:16:30 +0000</pubDate>
+            <sparkle:version>50</sparkle:version>
+            <sparkle:shortVersionString>0.2.1</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <enclosure url="https://github.com/hasanjafri/Mimer/releases/download/v0.2.1/Mimer-0.2.1.dmg" length="2416411" type="application/octet-stream" sparkle:edSignature="NSbBQ+feS3Ut5kq8F7WcpK4+iB11FiDvxeNw4M7OxxzRjR04iT4foHweX7MGFoWxTT3KMfZFOCSdIXt1qOeaBw=="/>
+        </item>
+        <item>
             <title>0.2.0</title>
             <pubDate>Sun, 21 Jun 2026 05:00:44 +0000</pubDate>
             <sparkle:version>0.2.0</sparkle:version>
