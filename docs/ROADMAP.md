@@ -52,11 +52,11 @@ images; concurrency machinery sits just before the image/OCR work that needs it.
    links · reveal an existing file path in Finder — all derived live from text so old clips
    work too. Deferred (needs config): open commit on a remote · open issue in a tracker ·
    open `file:line` in an editor — a later PR with a Settings → Developer pane.
-3. **Scoped/regex search + paste-stack**. *Both shipped.* Search (`SearchQuery`): `type:<kind>`,
-   `type:secret`/`is:secret` (live), `is:fav`, and `/regex/`, composable with fuzzy text.
-   Paste-stack (`PasteStack`): ⇥ queues clips (numbered), ⇧⏎ pastes them in order via
-   `dismiss(pasteSequence:)` — ⏎ stays single-paste. Still pending: `app:<name>` scoping
-   (needs a source-app field — additive, CloudKit-valid migration).
+3. **Scoped/regex search + paste-stack**. *Shipped.* Search (`SearchQuery`): `type:<kind>`,
+   `type:secret`/`is:secret` (live), `is:fav`, `app:<name>` (source app — captured in
+   `Clip.sourceApp`, shown in the row), and `/regex/`, composable with fuzzy text. Paste-stack
+   (`PasteStack`): ⇥ queues clips (numbered), ⇧⏎ pastes them in order via
+   `dismiss(pasteSequence:)` — ⏎ stays single-paste.
 4. **Encrypt at rest** — *shipped (text).* `Cryptor` does **app-layer** AES-GCM on the
    `text` field (`"enc:v1:"+base64`) with a 256-bit Keychain key, keyed-HMAC dedupe, and a
    lazy in-place migration of the existing store that vacuums + `secure_delete`s the freed

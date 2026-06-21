@@ -3,8 +3,47 @@ import Foundation
 @testable import Mimer
 
 final class SearchQueryTests: XCTestCase {
-    private func item(_ text: String, kind: ClipKind = .text, fav: Bool = false) -> ClipItem {
-        ClipItem(id: UUID(), text: text, kind: kind, createdAt: Date(), isFavorite: fav)
+    private func item(_ text: String, kind: ClipKind = .text, fav: Bool = false, app: String? = nil) -> ClipItem {
+        ClipItem(id: UUID(), text: text, kind: kind, createdAt: Date(), isFavorite: fav, sourceApp: app)
+    }
+
+    func testAppFilterMatchesSourceAppCaseInsensitively() {
+        let q = SearchQuery.parse("app:safari")
+        XCTAssertEqual(q.appFilter, "safari")
+        XCTAssertTrue(q.matches(item("x", app: "Safari")))
+        XCTAssertTrue(q.matches(item("x", app: "Safari Technology Preview")))   // substring
+        XCTAssertFalse(q.matches(item("x", app: "Terminal")))
+        XCTAssertFalse(q.matches(item("x", app: nil)))                          // no source → excluded
+    }
+
+    func testQuotedMultiWordAppFilter() {
+        let q = SearchQuery.parse("app:\"Visual Studio Code\" foo")
+        XCTAssertEqual(q.appFilter, "Visual Studio Code")
+        XCTAssertEqual(q.text, "foo")
+        XCTAssertTrue(q.matches(item("foobar", app: "Visual Studio Code")))
+        XCTAssertFalse(q.matches(item("foobar", app: "Xcode")))
+    }
+
+    func testAppFilterStripsStrayQuotes() {
+        // A single-token quoted value (or a leaked one) must not keep its quotes.
+        XCTAssertEqual(SearchQuery.parse("app:\"Xcode\"").appFilter, "Xcode")
+        XCTAssertEqual(SearchQuery.parse("app:\"unclosed").appFilter, "unclosed")
+    }
+
+    func testMultipleQuotedAppFiltersNoQuoteLeak() {
+        // Two quoted app: filters — last wins, neither leaks quotes into the value or text.
+        let q = SearchQuery.parse("app:\"a b\" app:\"c d\" hi")
+        XCTAssertEqual(q.appFilter, "c d")
+        XCTAssertEqual(q.text, "hi")
+        XCTAssertFalse(q.text.contains("\""))
+    }
+
+    func testAppPlusTextComposes() {
+        let q = SearchQuery.parse("app:Terminal git")
+        XCTAssertEqual(q.appFilter, "Terminal")
+        XCTAssertEqual(q.text, "git")
+        XCTAssertTrue(q.matches(item("git status", app: "Terminal")))
+        XCTAssertFalse(q.matches(item("npm install", app: "Terminal")))   // fuzzy "git" fails
     }
 
     func testEmptyMatchesAll() {

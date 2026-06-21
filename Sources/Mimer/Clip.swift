@@ -99,6 +99,7 @@ final class Clip: NSManagedObject {
     @NSManaged var createdAt: Date?
     @NSManaged var lastUsedAt: Date?
     @NSManaged var isFavorite: Bool
+    @NSManaged var sourceApp: String?   // localized name of the app the clip was copied from
 
     static func fetch() -> NSFetchRequest<Clip> { NSFetchRequest<Clip>(entityName: "Clip") }
 }
@@ -112,4 +113,5 @@ struct ClipItem: Identifiable, Equatable {
     let kind: ClipKind
     let createdAt: Date
     let isFavorite: Bool
+    var sourceApp: String? = nil
 }

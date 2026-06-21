@@ -9,6 +9,7 @@ struct SearchQuery {
     var onlyFavorites = false            // is:fav
     var onlySecrets = false              // type:secret / is:secret (live detection, works on old clips)
     var regex: NSRegularExpression? = nil  // /pattern/  (case-insensitive)
+    var appFilter: String? = nil         // app:<name> — case-insensitive substring of the source app
     var text = ""                        // leftover fuzzy text
 
     /// type: aliases → the kind(s) they match.
@@ -33,7 +34,17 @@ struct SearchQuery {
         var q = SearchQuery()
         var textTokens: [String] = []
         var usedOperator = false
-        for token in raw.split(separator: " ") {
+
+        // Pull every quoted app filter first (e.g. app:"Visual Studio Code") so no quoted
+        // value reaches the space-splitter and leaks quotes; the last one wins.
+        var rest = raw
+        while let r = rest.range(of: #"app:"[^"]*""#, options: .regularExpression) {
+            let value = String(rest[r].dropFirst("app:\"".count).dropLast())
+            if !value.isEmpty { q.appFilter = value; usedOperator = true }
+            rest.removeSubrange(r)
+        }
+
+        for token in rest.split(separator: " ") {
             let t = String(token)
             let lower = t.lowercased()
             if lower.hasPrefix("type:") {
@@ -41,6 +52,11 @@ struct SearchQuery {
                 if v == "secret" { q.onlySecrets = true; usedOperator = true }
                 else if let ks = kindMap[v] { q.kinds = (q.kinds ?? []).union(ks); usedOperator = true }
                 else { textTokens.append(t) }   // unknown type: → treat as literal text
+            } else if lower.hasPrefix("app:") {
+                var v = String(t.dropFirst("app:".count))   // original case; matched case-insensitively
+                if v.hasPrefix("\"") { v.removeFirst() }    // strip stray quotes (e.g. a single-token app:"x")
+                if v.hasSuffix("\"") { v.removeLast() }
+                if v.isEmpty { textTokens.append(t) } else { q.appFilter = v; usedOperator = true }
             } else if lower == "is:fav" || lower == "is:favorite" {
                 q.onlyFavorites = true; usedOperator = true
             } else if lower == "is:secret" {
@@ -75,7 +91,7 @@ struct SearchQuery {
 
     /// True if no filters and no text — the palette can skip filtering entirely.
     var isEmpty: Bool {
-        kinds == nil && !onlyFavorites && !onlySecrets && regex == nil && text.isEmpty
+        kinds == nil && !onlyFavorites && !onlySecrets && regex == nil && appFilter == nil && text.isEmpty
     }
 
     func matches(_ item: ClipItem) -> Bool {
@@ -83,6 +99,10 @@ struct SearchQuery {
             // Match the stored kind OR the live-detected kind, so `type:link`/`type:file`
             // also find clips captured before type detection existed (stored as .text).
             if !kinds.contains(item.kind), !kinds.contains(ClipKind.detect(from: item.text)) { return false }
+        }
+        if let appFilter {
+            guard let app = item.sourceApp,
+                  app.range(of: appFilter, options: .caseInsensitive) != nil else { return false }
         }
         if onlyFavorites, !item.isFavorite { return false }
         if onlySecrets, !SecretDetector.isSecret(item.text) { return false }
