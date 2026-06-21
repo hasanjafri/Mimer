@@ -86,8 +86,9 @@ fi
 rm -rf "$BUILD/appcast-src"; mkdir -p "$BUILD/appcast-src"; cp "$DMG" "$BUILD/appcast-src/"
 "$GENAPPCAST" --download-url-prefix "https://github.com/hasanjafri/Mimer/releases/download/v$VERSION/" \
   "$BUILD/appcast-src" -o "$DIR/appcast.xml"
-# Verify this version actually made it into the signed feed.
-if ! grep -q "<sparkle:version>$VERSION</sparkle:version>" "$DIR/appcast.xml"; then
+# Verify this version actually made it into the signed feed (-F: dots in the
+# version are literal, not regex wildcards).
+if ! grep -qF "<sparkle:version>$VERSION</sparkle:version>" "$DIR/appcast.xml"; then
   echo "✗ appcast.xml does not contain version $VERSION after generation"
   exit 1
 fi
