@@ -68,9 +68,9 @@ Planned: rich types (images/files), more transforms.
 
 Mimer stores history in a local Core Data database under
 `~/Library/Application Support/Mimer/` and makes **no network requests**. Clip
-contents are **encrypted at rest** (AES-GCM; the key lives in your macOS Keychain,
-this-device-only) — the sqlite file holds only ciphertext, and upgrading encrypts
-your existing history in place and scrubs the old plaintext. It also ignores clips
+contents **and the captured source-app name** are **encrypted at rest** (AES-GCM; the
+key lives in your macOS Keychain, this-device-only) — the sqlite file holds only
+ciphertext, and upgrading encrypts your existing history in place and scrubs the old plaintext. It also ignores clips
 marked transient/concealed/auto-generated (the standard `org.nspasteboard.*` hints
 password managers and other tools set) and ships with a built-in password-manager
 blocklist (1Password, Bitwarden, Apple Passwords, KeePassXC, …). Reading the

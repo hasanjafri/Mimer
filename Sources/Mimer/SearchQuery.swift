@@ -34,7 +34,16 @@ struct SearchQuery {
         var q = SearchQuery()
         var textTokens: [String] = []
         var usedOperator = false
-        for token in raw.split(separator: " ") {
+
+        // Pull a quoted multi-word app filter first: app:"Visual Studio Code".
+        var rest = raw
+        if let r = rest.range(of: #"app:"[^"]*""#, options: .regularExpression) {
+            let value = String(rest[r].dropFirst("app:\"".count).dropLast())
+            if !value.isEmpty { q.appFilter = value; usedOperator = true }
+            rest.removeSubrange(r)
+        }
+
+        for token in rest.split(separator: " ") {
             let t = String(token)
             let lower = t.lowercased()
             if lower.hasPrefix("type:") {

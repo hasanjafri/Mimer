@@ -27,7 +27,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             shouldCapture: { CaptureGate.captureAllowed() },
             onCapture: { text in
                 // The frontmost app at capture time is (best-effort) where the clip came from.
-                ClipStore.shared.insert(text: text, sourceApp: NSWorkspace.shared.frontmostApplication?.localizedName)
+                // Don't attribute to Mimer itself (ambiguous) → store nil.
+                let app = NSWorkspace.shared.frontmostApplication
+                let source = app?.bundleIdentifier == Bundle.main.bundleIdentifier ? nil : app?.localizedName
+                ClipStore.shared.insert(text: text, sourceApp: source)
             }
         )
         monitor.start()

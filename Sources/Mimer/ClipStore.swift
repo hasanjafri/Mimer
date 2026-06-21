@@ -52,6 +52,7 @@ final class ClipStore: ObservableObject {
         if let existing = (try? context.fetch(request))?.first {
             existing.createdAt = now      // re-copy → move to top
             existing.lastUsedAt = now
+            existing.sourceApp = sourceApp.flatMap(cryptor.encrypt)   // refresh provenance (encrypted)
         } else {
             guard let encrypted = cryptor.encrypt(text) else { return }   // fail closed — never store plaintext
             let clip = NSEntityDescription.insertNewObject(forEntityName: "Clip", into: context) as! Clip
@@ -62,7 +63,7 @@ final class ClipStore: ObservableObject {
             clip.createdAt = now
             clip.lastUsedAt = now
             clip.isFavorite = false
-            clip.sourceApp = sourceApp
+            clip.sourceApp = sourceApp.flatMap(cryptor.encrypt)   // metadata is encrypted too (keeps "ciphertext only")
         }
 
         // Only prune + pulse if the capture actually persisted — never batch-delete history
@@ -221,7 +222,7 @@ final class ClipStore: ObservableObject {
                 kind: ClipKind(rawValue: kindRaw) ?? .text,
                 createdAt: createdAt,
                 isFavorite: isFavorite,
-                sourceApp: row["sourceApp"] as? String
+                sourceApp: (row["sourceApp"] as? String).flatMap(cryptor.decrypt)
             )
         }
     }

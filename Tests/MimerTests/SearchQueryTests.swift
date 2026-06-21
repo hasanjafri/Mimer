@@ -16,6 +16,14 @@ final class SearchQueryTests: XCTestCase {
         XCTAssertFalse(q.matches(item("x", app: nil)))                          // no source → excluded
     }
 
+    func testQuotedMultiWordAppFilter() {
+        let q = SearchQuery.parse("app:\"Visual Studio Code\" foo")
+        XCTAssertEqual(q.appFilter, "Visual Studio Code")
+        XCTAssertEqual(q.text, "foo")
+        XCTAssertTrue(q.matches(item("foobar", app: "Visual Studio Code")))
+        XCTAssertFalse(q.matches(item("foobar", app: "Xcode")))
+    }
+
     func testAppPlusTextComposes() {
         let q = SearchQuery.parse("app:Terminal git")
         XCTAssertEqual(q.appFilter, "Terminal")

@@ -62,10 +62,11 @@ Typical loop: edit → `xcodebuild build` → relaunch the Debug app → drive v
   (`kTCCServicePostEvent`, `.privateState` source — not Accessibility, not AppleScript).
 - `CaptureGate` — pause + per-app exclusions + a password-manager bundle blocklist
   (belt-and-suspenders with ConcealedType, which is the primary defense).
-- `Clip.sourceApp` — localized name of the frontmost app at capture time (best-effort,
-  read from `NSWorkspace` in the monitor's `onCapture`); additive, optional, **unencrypted**
-  (it's metadata, and must be queryable for `app:` filtering). Shown dimmed in the row;
-  filterable via `app:`. Old clips have nil. Lightweight-migrates (CloudKit-valid).
+- `Clip.sourceApp` — localized name of the frontmost app at capture time (best-effort, read
+  from `NSWorkspace` in the monitor's `onCapture`; Mimer's own bundle → nil). Additive,
+  optional, **encrypted** like `text` (so the sqlite stays ciphertext-only); `app:` filtering
+  runs on the decrypted in-memory `ClipItem.sourceApp`, not a DB predicate. Shown dimmed in
+  the row. Old clips have nil. Lightweight-migrates (CloudKit-valid).
 - `ClipStore` (`@MainActor`, Core Data) — projection (dictionary) fetch, batch-delete
   prune (**favorites + snippets exempt**), keyed-HMAC `contentHash` dedupe; exposes `items`
   (history) and `snippets`; `save()` rolls back on failure. **Encrypts at rest:** `text` is
