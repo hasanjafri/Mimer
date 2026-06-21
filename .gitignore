@@ -38,3 +38,4 @@ AuthKey_*.p8
 
 # Logs
 *.log
+Sources/Mimer/Info.plist

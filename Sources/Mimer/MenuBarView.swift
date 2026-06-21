@@ -106,6 +106,10 @@ struct MenuBarView: View {
                 Label("New Snippet…", systemImage: "square.and.pencil")
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
+            Button { UpdaterController.shared.checkForUpdates() } label: {
+                Label("Check for Updates…", systemImage: "arrow.triangle.2.circlepath")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
             Button { SettingsWindowController.shared.show() } label: {
                 Label("Settings…", systemImage: "gearshape")
                     .frame(maxWidth: .infinity, alignment: .leading)

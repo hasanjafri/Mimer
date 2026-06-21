@@ -32,6 +32,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         PaletteController.shared.setup()
         OnboardingWindowController.shared.showIfNeeded()
+        _ = UpdaterController.shared   // start Sparkle's auto-update checks
         #if DEBUG
         DebugBridge.shared.start()
         #endif

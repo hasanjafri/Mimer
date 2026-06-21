@@ -75,6 +75,15 @@ xcrun stapler staple "$DMG"
 xcrun stapler validate "$DMG"
 spctl --assess --type open --context context:primary-signature --verbose "$DMG" || true
 
+# Update + sign the Sparkle appcast (uses your private EdDSA key from the keychain).
+GENAPPCAST=$(find ~/Library/Developer/Xcode/DerivedData/Mimer-*/SourcePackages -name generate_appcast -type f 2>/dev/null | head -1)
+if [ -n "$GENAPPCAST" ]; then
+  rm -rf "$BUILD/appcast-src"; mkdir -p "$BUILD/appcast-src"; cp "$DMG" "$BUILD/appcast-src/"
+  "$GENAPPCAST" --download-url-prefix "https://github.com/hasanjafri/Mimer/releases/download/v$VERSION/" \
+    "$BUILD/appcast-src" -o "$DIR/appcast.xml" \
+    && echo "▸ appcast.xml updated — commit + push it after creating the GitHub release"
+fi
+
 echo
 echo "✅ $DMG"
 echo "   signed · notarized · stapled"
