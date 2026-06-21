@@ -13,13 +13,16 @@ enum Paster {
     @discardableResult
     static func requestPostEventAccess() -> Bool { CGRequestPostEventAccess() }
 
-    static func copyToPasteboard(_ text: String) {
+    /// Returns whether the write actually landed, so callers can avoid confirming
+    /// a copy that didn't happen. Discardable — most callers don't care.
+    @discardableResult
+    static func copyToPasteboard(_ text: String) -> Bool {
         let pb = NSPasteboard.general
         pb.clearContents()
         // Stamp our own writes so the monitor skips them (no capture feedback loop).
         let restored = NSPasteboard.PasteboardType("org.nspasteboard.RestoredType")
         pb.declareTypes([.string, restored], owner: nil)
-        pb.setString(text, forType: .string)
+        return pb.setString(text, forType: .string)
     }
 
     /// Synthesize ⌘V into whatever app is frontmost. Returns false if we lack
