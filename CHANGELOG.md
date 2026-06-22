@@ -13,6 +13,7 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Configurable act-on integrations** — open a clip as a commit / issue / in your editor (Settings → Developer).
 - **More ⌘K transforms** — JSON → type, line operations, additional case conversions.
 - **Image clips** — copied images are captured with a thumbnail and pasted back; encrypted at rest like every clip.
+- **Rebindable palette hotkey** — change the ⇧⌘V shortcut in Settings → General.
 
 ### Changed
 - Concurrency groundwork toward Swift 6 (`strict-concurrency=complete`, clean).

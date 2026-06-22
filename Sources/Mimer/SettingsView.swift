@@ -1,6 +1,7 @@
 import SwiftUI
 import AppKit
 import UniformTypeIdentifiers
+import KeyboardShortcuts
 
 /// Settings shell. More panes (Appearance / About) fill in later;
 /// opened via the dedicated AppKit window from the menu bar.
@@ -26,6 +27,14 @@ private struct GeneralSettingsView: View {
 
     var body: some View {
         Form {
+            Section {
+                KeyboardShortcuts.Recorder("Open Mimer", name: .togglePalette)
+            } header: {
+                Text("Shortcut")
+            } footer: {
+                Text("The global hotkey to summon the clipboard palette. Default ⇧⌘V.")
+            }
+
             Section {
                 Stepper(value: $prefs.historyLimit, in: 25...1000, step: 25) {
                     Text("Keep up to **\(prefs.historyLimit)** clips")

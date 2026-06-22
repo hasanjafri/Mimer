@@ -57,7 +57,7 @@ Planned: file clips, more transforms, OCR on images.
 
 | Key | Action |
 | --- | --- |
-| `⇧⌘V` | Open / close the palette |
+| `⇧⌘V` | Open / close the palette (rebindable in Settings → General) |
 | `↑` `↓` | Move selection |
 | `⏎` | Paste the selected clip |
 | `⌘1`–`⌘9` | Paste that result |
