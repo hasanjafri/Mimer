@@ -72,6 +72,9 @@ Typical loop: edit → `xcodebuild build` → relaunch the Debug app → drive v
 - `Paster` — `copyToPasteboard` stamps `org.nspasteboard.RestoredType` so the monitor
   skips our own paste-backs; `synthesizePaste` posts ⌘V via CGEvent
   (`kTCCServicePostEvent`, `.privateState` source — not Accessibility, not AppleScript).
+  Auto-paste re-verifies the target app is still frontmost after the focus settle before
+  posting ⌘V (`CommandPalettePanel.activateThenPaste`, same guard as the paste-stack) — if
+  focus moved, the clip stays on the clipboard rather than pasting into the wrong app.
 - `CaptureGate` — pause + per-app exclusions + a password-manager bundle blocklist
   (belt-and-suspenders with ConcealedType, which is the primary defense).
 - `Clip.sourceApp` — localized name of the frontmost app at capture time (best-effort, read
