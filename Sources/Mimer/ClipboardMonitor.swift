@@ -85,6 +85,13 @@ final class ClipboardMonitor {
         let changeCount = pasteboard.changeCount
         guard changeCount != lastChangeCount else { return false }
 
+        // Fail closed while an excluded app is (or was just) the current one. The activation
+        // notification that advances lastChangeCount is delivered async, so a tick can land after
+        // focus left the excluded app but before that handler runs — `currentAppExcluded` is the
+        // lagging signal that still reflects the excluded app, so we skip (and consume the change)
+        // rather than capture its copy into a now-allowed frontmost.
+        guard !currentAppExcluded else { lastChangeCount = changeCount; return false }
+
         let types = Set((pasteboard.types ?? []).map(\.rawValue))
         // Skip ignored markers (concealed/transient/auto-generated/our-own-paste) BEFORE reading
         // the value — never materialize a password-manager string into memory.
