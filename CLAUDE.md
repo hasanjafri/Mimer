@@ -2,7 +2,7 @@
 
 Mimer is a fast, private, **developer-first clipboard manager for macOS**, shipped
 open-source (MIT). It matches Maccy/CopyClip and adds what they lack — type-aware
-clips and ⌘K transforms — for free. **v0.2.1 is live**, auto-updating via Sparkle.
+clips and ⌘K transforms — for free. **v0.2.2 is live**, auto-updating via Sparkle.
 
 - Repo: https://github.com/hasanjafri/Mimer · Tap: https://github.com/hasanjafri/homebrew-tap
 - Install: `brew install --cask hasanjafri/tap/mimer` (or the notarized DMG on the release)
@@ -190,21 +190,25 @@ squircle + white clipboard), then re-size into `Assets.xcassets/AppIcon.appicons
 
 ## Status & roadmap
 
-**v0.2.1 shipped**, with CI/CD + Sparkle auto-update + a Homebrew tap, all live and
-audited (`docs/CODE_REVIEW.md`). Strategy is decided: **wedge-first hybrid** — lead with
-the transform engine + developer-domain awareness + provable privacy; ship images/files/
-filters as hygiene; defer OCR. Full sequenced plan + risks + design invariants in
-**`docs/ROADMAP.md`**. (Tap version/sha bump is now automated by the release Action.)
+**v0.2.2 shipped** — CI/CD + Sparkle auto-update + a Homebrew tap, all live. Strategy is
+decided: **wedge-first hybrid** — lead with the transform engine + developer-domain awareness +
+provable privacy; ship images/files/filters as hygiene; defer OCR. Full sequenced plan + risks +
+design invariants in **`docs/ROADMAP.md`**; per-release notes in **`CHANGELOG.md`**. (Cut releases
+with `gh workflow run release.yml -f bump=patch` — it builds/signs/notarizes, makes the GitHub
+release, commits the appcast + version bump, and bumps the tap; then finalize the CHANGELOG.)
 
-Shipped since 0.2.1 (unreleased on `main`): **secret detection + masking** (`SecretDetector`),
-**encrypt history at rest** (`Cryptor`, AES-GCM + Keychain key, lazy migration + vacuum), and
-**developer-domain awareness** (type detection + ⌘O act-on incl. configurable open-commit/
-issue/editor integrations via `ClipAction`), and
-**scoped/regex search** (`SearchQuery` — `type:`/`is:`/`app:`/`/regex/`, with `Clip.sourceApp`
-capture), **paste-stack** (`PasteStack` — ⇥ queue, ⇧⏎ paste in order), **more transforms**
-(JSON→TS, line ops, case), and **configurable act-on integrations** (Settings → Developer:
-open commit/issue/editor), and **concurrency groundwork** (strict-concurrency=complete clean,
-`@MainActor`/`Sendable` annotations), and **image-clip storage** (`BlobStore` — encrypted,
-content-addressed; `Clip.blobHash` + `insertImage`), and **image clips end-to-end** (7b+7c —
-capture, async thumbnails, paste-back). **All roadmap buckets 1–6 shipped.** Follow-ups:
-off-main *capture*, orphan blob sweep, lazy full-image preview, file clips, OCR.
+In v0.2.2 (**roadmap buckets 1–6 all shipped**): secret detection + masking (`SecretDetector`),
+**encrypt history at rest** (`Cryptor`, AES-GCM + Keychain key, lazy migration + vacuum),
+developer-domain awareness (type detection + ⌘O act-on via `ClipAction`), scoped/regex search
+(`SearchQuery` + `Clip.sourceApp`), paste-stack (`PasteStack`), more transforms (JSON→TS, line
+ops, case), concurrency groundwork (strict-concurrency=complete), image clips end-to-end
+(`BlobStore` + capture + async thumbnails + paste-back), and a **rebindable palette hotkey**
+(`KeyboardShortcuts.Recorder`). Post-review hardening also in v0.2.2: auto-paste target
+re-verification, keychain-unavailable non-destructive store, excluded-app capture-race fix,
+two UI bugs (settings window size, uniform menu row height), an accessibility pass, and the
+contributor scaffolding (CONTRIBUTING/SECURITY/CHANGELOG/issue+PR templates).
+
+Open / next (P2 from the CEO review in `~/.gstack/projects/.../ceo-plans/`): bind the
+`DesignSystem` tokens + extract a shared `ClipRow` (menu/palette divergence); content depth —
+clip **detail/preview** pane, row timestamps + source-app icon, image dimensions, delete-undo;
+then file clips, OCR, the Swift 6 language-mode flip, off-main *capture*, and an orphan-blob sweep.
