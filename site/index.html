@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mimer — Fast, private, developer-first clipboard manager for macOS</title>
+<meta name="description" content="Mimer is a free, open-source clipboard manager for macOS. A fast ⇧⌘V command palette with type-aware history, ⌘K transforms, scoped search, and encrypted-at-rest privacy. A free alternative to Maccy and CopyClip, built for developers.">
+<meta name="keywords" content="clipboard manager, macOS clipboard manager, clipboard history, menu bar app, developer tools, Maccy alternative, CopyClip alternative, open source, Swift, SwiftUI, command palette, paste history">
+<meta name="author" content="Hasan Jafri">
+<meta name="theme-color" content="#4A40E6">
+<link rel="canonical" href="https://hasanjafri.github.io/Mimer/">
+
+<!-- Open Graph -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Mimer">
+<meta property="og:title" content="Mimer — Fast, private, developer-first clipboard manager for macOS">
+<meta property="og:description" content="A free, open-source macOS clipboard manager: a ⇧⌘V command palette with type-aware history, ⌘K transforms, and encrypted-at-rest privacy. A free alternative to Maccy and CopyClip.">
+<meta property="og:url" content="https://hasanjafri.github.io/Mimer/">
+<meta property="og:image" content="https://hasanjafri.github.io/Mimer/media/og.png">
+<meta property="og:image:width" content="2560">
+<meta property="og:image:height" content="1280">
+
+<!-- Twitter -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Mimer — Fast, private, developer-first clipboard manager for macOS">
+<meta name="twitter:description" content="A free, open-source macOS clipboard manager: a ⇧⌘V command palette with type-aware history, ⌘K transforms, and encrypted-at-rest privacy.">
+<meta name="twitter:image" content="https://hasanjafri.github.io/Mimer/media/og.png">
+
+<!-- Structured data: helps search engines and AI agents understand what this is -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Mimer",
+  "applicationCategory": "DeveloperApplication",
+  "applicationSubCategory": "Clipboard Manager",
+  "operatingSystem": "macOS 14.0 or later",
+  "description": "A fast, private, developer-first clipboard manager for macOS. A ⇧⌘V command palette with type-aware clipboard history, ⌘K transforms, scoped search, and history encrypted at rest. Free and open source (MIT).",
+  "url": "https://hasanjafri.github.io/Mimer/",
+  "downloadUrl": "https://github.com/hasanjafri/Mimer/releases/latest",
+  "softwareVersion": "0.2.2",
+  "license": "https://opensource.org/licenses/MIT",
+  "isAccessibleForFree": true,
+  "author": { "@type": "Person", "name": "Hasan Jafri" },
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "featureList": [
+    "Type-aware clipboard history (links, code, colors, git SHAs, issue keys, file paths)",
+    "⌘K transforms with live preview (case, slugify, Base64/URL, JSON pretty-print, JSON to TypeScript, decode JWT, Unix to ISO)",
+    "Scoped search (type:, app:, /regex/) and a paste-stack",
+    "History encrypted at rest with on-screen secret masking",
+    "Local-only, no telemetry, no subscription"
+  ]
+}
+</script>
+
+<style>
+  :root {
+    --indigo: #4A40E6; --violet: #8F47ED; --ink: #1c1b29; --muted: #5b5870;
+    --bg: #ffffff; --card: #f7f6fb; --line: #e8e6f2;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; color: var(--ink); background: var(--bg);
+    font: 17px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--indigo); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 0 24px; }
+
+  header.hero {
+    background: linear-gradient(135deg, var(--indigo), var(--violet));
+    color: #fff; padding: 88px 0 76px; text-align: center;
+  }
+  header.hero h1 { font-size: 64px; margin: 0 0 8px; letter-spacing: -1.5px; }
+  header.hero .tag { font-size: 22px; font-weight: 600; opacity: .97; margin: 0 auto 6px; max-width: 620px; }
+  header.hero .sub { font-size: 16px; opacity: .82; margin: 0 auto 28px; max-width: 560px; }
+
+  .cta { display: inline-flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+  .btn {
+    display: inline-block; padding: 12px 22px; border-radius: 11px; font-weight: 600; font-size: 16px;
+  }
+  .btn.primary { background: #fff; color: var(--indigo); }
+  .btn.ghost { background: rgba(255,255,255,.14); color: #fff; border: 1px solid rgba(255,255,255,.35); }
+  .btn:hover { text-decoration: none; opacity: .92; }
+
+  .brew {
+    display: inline-block; margin-top: 22px; background: rgba(0,0,0,.22); color: #fff;
+    padding: 10px 16px; border-radius: 10px; font: 15px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+
+  section { padding: 64px 0; border-bottom: 1px solid var(--line); }
+  section h2 { font-size: 30px; letter-spacing: -.5px; margin: 0 0 8px; }
+  section .lede { color: var(--muted); margin: 0 0 32px; font-size: 18px; }
+
+  .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; }
+  .feature { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 20px 22px; }
+  .feature h3 { margin: 0 0 6px; font-size: 18px; }
+  .feature p { margin: 0; color: var(--muted); font-size: 15.5px; }
+
+  figure { margin: 28px 0 0; text-align: center; }
+  figure img { max-width: 100%; border-radius: 14px; border: 1px solid var(--line); }
+  figure figcaption { color: var(--muted); font-size: 14px; margin-top: 10px; }
+
+  .kbd { font: 13px ui-monospace, Menlo, monospace; background: #efedf8; border: 1px solid var(--line);
+         border-bottom-width: 2px; border-radius: 6px; padding: 1px 6px; color: var(--ink); }
+  code.block {
+    display: block; background: #14131f; color: #eceaff; border-radius: 12px; padding: 16px 18px;
+    font: 14px/1.7 ui-monospace, SFMono-Regular, Menlo, monospace; overflow-x: auto; margin: 16px 0 0;
+  }
+  footer { padding: 40px 0 56px; color: var(--muted); font-size: 14.5px; text-align: center; }
+  footer a { color: var(--muted); text-decoration: underline; }
+  @media (max-width: 640px) {
+    header.hero h1 { font-size: 48px; }
+    .grid { grid-template-columns: 1fr; }
+    section { padding: 48px 0; }
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <h1>Mimer</h1>
+    <p class="tag">A fast, private, developer-first clipboard manager for macOS.</p>
+    <p class="sub">Lives in your menu bar, remembers everything you copy, and gets out of the way until you press <span class="kbd" style="background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.3);color:#fff">⇧⌘V</span> — then it's a command palette that understands what you copied and can transform it on the spot. Free and open source.</p>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/hasanjafri/Mimer/releases/latest">Download for macOS</a>
+      <a class="btn ghost" href="https://github.com/hasanjafri/Mimer">View on GitHub</a>
+    </div>
+    <div><span class="brew">brew install --cask hasanjafri/tap/mimer</span></div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="features">
+  <h2>What it does</h2>
+  <p class="lede">A free alternative to Maccy and CopyClip — with the type-awareness and transforms they lack, built for developers.</p>
+  <div class="grid">
+    <div class="feature">
+      <h3>Type-aware history</h3>
+      <p>Knows a link from code from a hex color from a git SHA, an issue key (<code>ABC-123</code>), or a file path / stack-trace <code>file:line</code> — and shows the right glyph, with a live swatch for colors.</p>
+    </div>
+    <div class="feature">
+      <h3>⌘K transforms</h3>
+      <p>Reshape a clip in place with a live preview: case, slugify, Base64/URL, JSON pretty-print, <strong>JSON → TypeScript</strong>, <strong>decode a JWT</strong>, Unix ↔ ISO time, and more. Only the transforms that apply are shown.</p>
+    </div>
+    <div class="feature">
+      <h3>Built for developers</h3>
+      <p>Scoped search (<code>type:</code>, <code>app:</code>, <code>/regex/</code>), a paste-stack, and <span class="kbd">⌘O</span> to open a commit, an issue, or a <code>file:line</code> straight in your browser, tracker, or editor.</p>
+    </div>
+    <div class="feature">
+      <h3>Private by default</h3>
+      <p>Local-only, no telemetry, no subscription. History is <strong>encrypted at rest</strong> (AES-GCM, key in your Keychain), and detected secrets are masked on screen so they never show on a screenshare.</p>
+    </div>
+  </div>
+
+  <figure>
+    <img src="media/transform.png" alt="Mimer ⌘K transform menu showing live previews for a selected clip" loading="lazy">
+    <figcaption>⌘K transforms — every transform shows a live preview, and only the ones that apply are listed.</figcaption>
+  </figure>
+  <figure>
+    <img src="media/search.gif" alt="Filtering Mimer clipboard history by typing a query" loading="lazy">
+    <figcaption>Search as you type, with scoped filters: <code>type:</code>, <code>app:</code>, <code>is:fav</code>, <code>/regex/</code>.</figcaption>
+  </figure>
+</section>
+
+<section id="more">
+  <h2>Everything else</h2>
+  <p class="lede">The clipboard-manager basics, done well — plus the developer extras.</p>
+  <div class="grid">
+    <div class="feature"><h3>Clipboard history</h3><p>Everything you copy, newest first, surviving restarts. Quick-paste a top result with <span class="kbd">⌘1</span>–<span class="kbd">⌘9</span>.</p></div>
+    <div class="feature"><h3>Image clips</h3><p>Copied images are captured with a thumbnail and pasted right back — and, like all clips, encrypted at rest.</p></div>
+    <div class="feature"><h3>Favorites &amp; snippets</h3><p><span class="kbd">⌘D</span> keeps a clip forever; author reusable snippets (signatures, boilerplate) that live in the palette.</p></div>
+    <div class="feature"><h3>Paste-stack</h3><p>Queue several clips with <span class="kbd">⇥</span>, then <span class="kbd">⇧⏎</span> to paste them all in order.</p></div>
+    <div class="feature"><h3>Pause &amp; exclusions</h3><p>Stop recording on demand, or never record while chosen apps are frontmost. Password managers are always ignored.</p></div>
+    <div class="feature"><h3>Auto-paste (optional)</h3><p><span class="kbd">⏎</span> pastes straight into your previous app once you grant one permission; otherwise the clip is on your clipboard for <span class="kbd">⌘V</span>.</p></div>
+  </div>
+</section>
+
+<section id="install">
+  <h2>Install</h2>
+  <p class="lede">Signed &amp; notarized, auto-updating via Sparkle. Requires macOS 14 (Sonoma) or later.</p>
+  <p><strong>Homebrew:</strong></p>
+  <code class="block">brew install --cask hasanjafri/tap/mimer</code>
+  <p style="margin-top:24px"><strong>Or download the DMG</strong> from the <a href="https://github.com/hasanjafri/Mimer/releases/latest">latest release</a>, open it, and drag Mimer to Applications.</p>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    Mimer is free and open source (<a href="https://github.com/hasanjafri/Mimer/blob/main/LICENSE">MIT</a>).
+    Named after <em>Mímir</em>, the Norse guardian of memory. ·
+    <a href="https://github.com/hasanjafri/Mimer">GitHub</a> ·
+    <a href="https://github.com/hasanjafri/Mimer/releases">Releases</a> ·
+    <a href="https://github.com/hasanjafri/Mimer/blob/main/CHANGELOG.md">Changelog</a>
+    <br>© 2026 Hasan Jafri
+  </div>
+</footer>
+
+</body>
+</html>

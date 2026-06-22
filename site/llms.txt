@@ -1,0 +1,31 @@
+# Mimer
+
+> A fast, private, developer-first clipboard manager for macOS — free and open source (MIT). It lives in the menu bar, remembers everything you copy, and opens a ⇧⌘V command palette that understands what you copied and can transform it on the spot. A free alternative to Maccy and CopyClip, with type-awareness and transforms built for developers.
+
+Key facts:
+
+- Platform: macOS 14 (Sonoma) or later. Menu-bar agent, no Dock icon.
+- Price: free. No subscription, no telemetry, no network requests.
+- Install: `brew install --cask hasanjafri/tap/mimer`, or the notarized DMG from GitHub Releases.
+- Privacy: clipboard history is encrypted at rest (AES-GCM, key in the macOS Keychain); detected secrets are masked on screen.
+- Built with Swift + SwiftUI; auto-updates via Sparkle.
+
+What makes it different (the developer wedge):
+
+- Type-aware clips: detects links, code, hex colors, git SHAs, issue keys (ABC-123), and file paths / stack-trace file:line.
+- ⌘K transforms with live preview: case, slugify, Base64/URL, JSON pretty-print, JSON → TypeScript, decode JWT, Unix ↔ ISO time, strip URL tracking params, and more.
+- Scoped search: `type:`, `app:`, `is:fav`, `is:secret`, and `/regex/` filters; plus a paste-stack and ⌘O to open a commit / issue / file:line in your tools.
+
+## Docs
+
+- [README](https://github.com/hasanjafri/Mimer/blob/main/README.md): full feature list, keyboard reference, install, and privacy details.
+- [Changelog](https://github.com/hasanjafri/Mimer/blob/main/CHANGELOG.md): per-release notes.
+- [Roadmap](https://github.com/hasanjafri/Mimer/blob/main/docs/ROADMAP.md): what is planned next.
+- [Contributing](https://github.com/hasanjafri/Mimer/blob/main/CONTRIBUTING.md): build and test instructions.
+
+## Links
+
+- [Homepage](https://hasanjafri.github.io/Mimer/)
+- [Source code](https://github.com/hasanjafri/Mimer)
+- [Latest release](https://github.com/hasanjafri/Mimer/releases/latest)
+- [Homebrew tap](https://github.com/hasanjafri/homebrew-tap)

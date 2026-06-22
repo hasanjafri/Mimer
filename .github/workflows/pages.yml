@@ -1,0 +1,46 @@
+name: Deploy site
+
+# Builds the static landing page (site/ + docs/media) and publishes it to
+# GitHub Pages. Separate from CI and Release; touches nothing in the app build.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'site/**'
+      - 'docs/media/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow one concurrent deployment; cancel in-progress runs for the same ref.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assemble site
+        run: |
+          mkdir -p _site/media
+          cp -R site/. _site/
+          cp -R docs/media/. _site/media/
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
