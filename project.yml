@@ -12,7 +12,7 @@ settings:
     # Migrate to Swift 6 language mode in Phase 1 with the concurrency-sensitive monitor.
     SWIFT_VERSION: "5.0"
     SWIFT_STRICT_CONCURRENCY: complete   # surface data-race issues now (Swift 6 prep)
-    MARKETING_VERSION: "0.2.1"
+    MARKETING_VERSION: "0.2.2"
     CURRENT_PROJECT_VERSION: "1"   # local-dev placeholder; releases set CFBundleVersion to the git commit count (see scripts/release.sh)
     DEVELOPMENT_TEAM: ""              # set when configuring Developer ID signing
     CODE_SIGN_STYLE: Automatic
