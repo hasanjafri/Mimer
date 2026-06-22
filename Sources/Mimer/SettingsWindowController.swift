@@ -16,7 +16,7 @@ final class SettingsWindowController {
     func show() {
         if window == nil {
             let w = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 460, height: 300),
+                contentRect: NSRect(x: 0, y: 0, width: 460, height: 380),   // match SettingsView's requested frame (was 300 → bottom clipped)
                 styleMask: [.titled, .closable],
                 backing: .buffered,
                 defer: false
