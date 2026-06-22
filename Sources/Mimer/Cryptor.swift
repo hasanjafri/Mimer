@@ -61,8 +61,23 @@ struct Cryptor {
     /// Deterministic dedupe fingerprint (HMAC-SHA256 hex) of the plaintext. Keyed,
     /// so the stored hash can't be used to confirm a guessed clip without the key.
     func dedupeHash(_ plaintext: String) -> String {
-        let mac = HMAC<SHA256>.authenticationCode(for: Data(plaintext.utf8), using: macKey)
-        return mac.map { String(format: "%02x", $0) }.joined()
+        dedupeHash(Data(plaintext.utf8))
+    }
+
+    /// HMAC-SHA256 hex of raw bytes — used to content-address (and dedupe) image blobs.
+    func dedupeHash(_ data: Data) -> String {
+        HMAC<SHA256>.authenticationCode(for: data, using: macKey).map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// Encrypt raw bytes (image blobs): AES-GCM `nonce|ciphertext|tag`, or nil on failure.
+    func seal(_ data: Data) -> Data? {
+        (try? AES.GCM.seal(data, using: aesKey))?.combined
+    }
+
+    /// Decrypt bytes produced by `seal`, or nil if corrupt / wrong key.
+    func open(_ data: Data) -> Data? {
+        guard let box = try? AES.GCM.SealedBox(combined: data) else { return nil }
+        return try? AES.GCM.open(box, using: aesKey)
     }
 }
 

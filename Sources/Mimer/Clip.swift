@@ -100,6 +100,7 @@ final class Clip: NSManagedObject {
     @NSManaged var lastUsedAt: Date?
     @NSManaged var isFavorite: Bool
     @NSManaged var sourceApp: String?   // localized name of the app the clip was copied from
+    @NSManaged var blobHash: String?    // for image clips: BlobStore reference (keyed HMAC hex, plaintext-safe)
 
     static func fetch() -> NSFetchRequest<Clip> { NSFetchRequest<Clip>(entityName: "Clip") }
 }
@@ -114,4 +115,5 @@ struct ClipItem: Identifiable, Equatable {
     let createdAt: Date
     let isFavorite: Bool
     var sourceApp: String? = nil
+    var blobHash: String? = nil   // image clips: the BlobStore reference to load the bytes
 }

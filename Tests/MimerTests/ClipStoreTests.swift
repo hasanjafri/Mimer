@@ -9,10 +9,19 @@ final class ClipStoreTests: XCTestCase {
     // Fixed key (never the Keychain) so tests are deterministic and a reopened store
     // on the same file can still decrypt what the first one wrote.
     private let cryptor = Cryptor(key: SymmetricKey(data: Data(repeating: 7, count: 32)))
+    // A temp blob dir per test class instance so image-clip tests never touch the real store.
+    private lazy var blobDir = FileManager.default.temporaryDirectory
+        .appendingPathComponent("clipstore-blobs-\(UUID().uuidString)", isDirectory: true)
+
+    override func tearDown() {
+        try? FileManager.default.removeItem(at: blobDir)
+        super.tearDown()
+    }
 
     private func makeStore(limit: Int? = nil, url: URL? = nil) -> ClipStore {
         let persistence = PersistenceController(inMemory: url == nil, storeURL: url)
-        let store = ClipStore(persistence: persistence, cryptor: cryptor)
+        let blobStore = BlobStore(directory: blobDir, cryptor: cryptor)
+        let store = ClipStore(persistence: persistence, cryptor: cryptor, blobStore: blobStore)
         store.historyLimitOverride = limit
         store.loadInitial()
         return store
@@ -32,6 +41,46 @@ final class ClipStoreTests: XCTestCase {
         store.insert(text: "shared", sourceApp: "Terminal")   // dedupe → same row, newest source wins
         XCTAssertEqual(store.items.filter { $0.text == "shared" }.count, 1)
         XCTAssertEqual(store.items.first(where: { $0.text == "shared" })?.sourceApp, "Terminal")
+    }
+
+    func testInsertImageStoresBlobAndRow() {
+        let store = makeStore()
+        let img = Data("fake-png-bytes".utf8) + Data(repeating: 42, count: 200)
+        store.insertImage(data: img)
+        let item = store.items.first
+        XCTAssertEqual(item?.kind, .image)
+        XCTAssertNotNil(item?.blobHash)
+        XCTAssertEqual(store.blobData(item!.blobHash!), img)   // round-trips through the encrypted blob
+    }
+
+    func testInsertImageDedupes() {
+        let store = makeStore()
+        let img = Data(repeating: 7, count: 300)
+        store.insertImage(data: img)
+        store.insert(text: "between")
+        store.insertImage(data: img)                           // same bytes → dedupe, move to top
+        XCTAssertEqual(store.items.filter { $0.kind == .image }.count, 1)
+        XCTAssertEqual(store.items.first?.kind, .image)        // moved to top
+    }
+
+    func testDeleteImageRemovesBlob() {
+        let store = makeStore()
+        store.insertImage(data: Data(repeating: 3, count: 128))
+        let item = store.items.first { $0.kind == .image }!
+        let hash = item.blobHash!
+        XCTAssertNotNil(store.blobData(hash))
+        store.delete(item.id)
+        XCTAssertNil(store.blobData(hash))                     // blob file removed with the row
+    }
+
+    func testPruneRemovesOverflowImageBlobs() {
+        let store = makeStore(limit: 2)
+        let imgs = (0..<3).map { Data("img\($0)".utf8) + Data(repeating: UInt8($0), count: 64) }
+        let hashes = imgs.map { Cryptor(key: SymmetricKey(data: Data(repeating: 7, count: 32))).dedupeHash($0) }
+        for img in imgs { store.insertImage(data: img) }       // 3 images, cap 2 → oldest pruned
+        XCTAssertLessThanOrEqual(store.items.count, 2)
+        XCTAssertNil(store.blobData(hashes[0]))                // oldest image's blob is gone
+        XCTAssertNotNil(store.blobData(hashes[2]))             // newest survives
     }
 
     func testInsertOrdersNewestFirst() {

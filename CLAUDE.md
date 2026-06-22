@@ -79,10 +79,17 @@ Typical loop: edit → `xcodebuild build` → relaunch the Debug app → drive v
   in memory only). On launch, `migrateToEncryptedIfNeeded()` lazily encrypts any legacy
   plaintext rows; if it rewrote any, it calls `persistence.vacuum()` to scrub the freed
   plaintext. `Cryptor` is injected (default `.shared`) so tests use a fixed key, never the Keychain.
-- `Cryptor` — app-layer field encryption (AES-GCM via CryptoKit), `"enc:v1:" + base64`;
-  keyed-HMAC `dedupeHash`. App-layer (not SQLCipher) **on purpose** — keeps the model
-  CloudKit-valid (ciphertext syncs fine). 256-bit key in the macOS Keychain
-  (`KeychainKey`, this-device-only); ephemeral fallback if the Keychain is unavailable.
+  Image clips: `insertImage(data:)` writes bytes to the `BlobStore` and a row referencing them
+  (`Clip.blobHash`, kind `.image`), dedupe by the blob's keyed hash; deleting/pruning a row
+  deletes its blob file too. `blobData(_:)` loads + decrypts for the UI/paste-back.
+- `Cryptor` — app-layer field encryption (AES-GCM via CryptoKit), `"enc:v1:" + base64` for
+  strings + `seal`/`open` for raw bytes (blobs); keyed-HMAC `dedupeHash` (String or Data).
+  App-layer (not SQLCipher) **on purpose** — keeps the model CloudKit-valid (ciphertext syncs
+  fine). 256-bit key in the macOS Keychain (`KeychainKey`, this-device-only); ephemeral fallback
+  if the Keychain is unavailable.
+- `BlobStore` — encrypted, content-addressed store for binary payloads (images) under
+  `…/Mimer/blobs/`. Filename = keyed HMAC of the bytes (dedupe + leaks nothing); contents =
+  AES-GCM via `Cryptor` (blob dir is ciphertext-only, like the sqlite). `Sendable` value type.
 - `PersistenceController` — programmatic `NSManagedObjectModel`, local sqlite, lightweight
   migration. `secure_delete=ON` (freed cells are zeroed, not just marked reusable);
   `vacuum()` rebuilds the file + truncates the WAL to drop free-page plaintext after the
@@ -179,5 +186,6 @@ issue/editor integrations via `ClipAction`), and
 capture), **paste-stack** (`PasteStack` — ⇥ queue, ⇧⏎ paste in order), **more transforms**
 (JSON→TS, line ops, case), and **configurable act-on integrations** (Settings → Developer:
 open commit/issue/editor), and **concurrency groundwork** (strict-concurrency=complete clean,
-`@MainActor`/`Sendable` annotations). Next in flight: image
-clips (with per-blob encryption).
+`@MainActor`/`Sendable` annotations), and **image-clip storage** (`BlobStore` — encrypted,
+content-addressed; `Clip.blobHash` + `insertImage`). Next in flight: image capture + thumbnails
+(7b), then paste-back (7c).

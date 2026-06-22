@@ -148,7 +148,8 @@ final class PersistenceController {
             attribute("createdAt", .dateAttributeType),
             attribute("lastUsedAt", .dateAttributeType),
             attribute("isFavorite", .booleanAttributeType, defaultValue: false),
-            attribute("sourceApp", .stringAttributeType)   // additive, optional → lightweight migration
+            attribute("sourceApp", .stringAttributeType),  // additive, optional → lightweight migration
+            attribute("blobHash", .stringAttributeType)    // image-blob reference (additive)
         ]
         model.entities = [clip]
         return model
