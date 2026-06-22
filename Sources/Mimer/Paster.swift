@@ -13,6 +13,14 @@ enum Paster {
     @discardableResult
     static func requestPostEventAccess() -> Bool { CGRequestPostEventAccess() }
 
+    /// Whether a synthetic paste should fire: only when a known target app is still alive AND
+    /// still frontmost, so a clip never lands in an app that grabbed focus during the delay.
+    /// Pure + unit-testable; callers pass PIDs read from `NSRunningApplication` at fire time.
+    static func shouldAutoPaste(targetPID: pid_t?, targetTerminated: Bool, frontmostPID: pid_t?) -> Bool {
+        guard let targetPID, !targetTerminated else { return false }   // unknown / gone target → fail closed
+        return frontmostPID == targetPID
+    }
+
     /// Returns whether the write actually landed, so callers can avoid confirming
     /// a copy that didn't happen. Discardable — most callers don't care.
     @discardableResult
