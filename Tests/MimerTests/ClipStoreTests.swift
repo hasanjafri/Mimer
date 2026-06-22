@@ -181,6 +181,24 @@ final class ClipStoreTests: XCTestCase {
         XCTAssertEqual(migrated?.contentHash, cryptor.dedupeHash("legacy plaintext"), "hash recomputed as HMAC")
     }
 
+    // The security-critical case: an ephemeral session must NOT migrate legacy plaintext into
+    // ciphertext it can't read back — that would scrub recoverable data. The row stays plaintext.
+    func testEphemeralKeyDoesNotMigrateLegacyPlaintext() {
+        let persistence = PersistenceController(inMemory: true)
+        let ctx = persistence.viewContext
+        let clip = NSEntityDescription.insertNewObject(forEntityName: "Clip", into: ctx) as! Clip
+        clip.id = UUID(); clip.text = "recoverable legacy plaintext"; clip.contentHash = "old"
+        clip.kind = 0; clip.createdAt = Date(); clip.lastUsedAt = Date(); clip.isFavorite = false
+        try? ctx.save()
+
+        let ephemeral = Cryptor(key: SymmetricKey(data: Data(repeating: 9, count: 32)), durable: false)
+        let store = ClipStore(persistence: persistence, cryptor: ephemeral)
+        store.loadInitial()   // migration must be SKIPPED with a non-durable key
+
+        let raw = (try? ctx.fetch(Clip.fetch()))?.first?.text
+        XCTAssertEqual(raw, "recoverable legacy plaintext", "ephemeral session must not scrub recoverable plaintext")
+    }
+
     func testMigrationVacuumsFileStoreWithoutDataLoss() {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("MimerVacuumTest-\(UUID().uuidString).sqlite")

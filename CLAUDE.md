@@ -95,8 +95,10 @@ Typical loop: edit → `xcodebuild build` → relaunch the Debug app → drive v
 - `Cryptor` — app-layer field encryption (AES-GCM via CryptoKit), `"enc:v1:" + base64` for
   strings + `seal`/`open` for raw bytes (blobs); keyed-HMAC `dedupeHash` (String or Data).
   App-layer (not SQLCipher) **on purpose** — keeps the model CloudKit-valid (ciphertext syncs
-  fine). 256-bit key in the macOS Keychain (`KeychainKey`, this-device-only); ephemeral fallback
-  if the Keychain is unavailable.
+  fine). 256-bit key in the macOS Keychain (`KeychainKey`, this-device-only). If the Keychain is
+  unusable, falls back to an **ephemeral** key (`Cryptor.isDurable == false`): the store then runs
+  **non-destructively** — `loadInitial` skips the legacy-plaintext migration + vacuum so existing
+  recoverable data is never scrubbed (new clips still persist but won't decrypt next launch).
 - `BlobStore` — encrypted, content-addressed store for binary payloads (images) under
   `…/Mimer/blobs/`. Filename = keyed HMAC of the bytes (dedupe + leaks nothing); contents =
   AES-GCM via `Cryptor` (blob dir is ciphertext-only, like the sqlite). `Sendable` value type.

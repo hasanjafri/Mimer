@@ -21,9 +21,16 @@ struct Cryptor {
     private let aesKey: SymmetricKey
     private let macKey: SymmetricKey
 
-    init(key master: SymmetricKey) {
+    /// False when the master key is an ephemeral fallback (Keychain unusable) — the key won't
+    /// survive a restart, so the store must run non-destructively (skip the legacy-plaintext
+    /// migration + vacuum) to avoid scrubbing still-recoverable data. True for tests + the
+    /// normal Keychain-backed key.
+    let isDurable: Bool
+
+    init(key master: SymmetricKey, durable: Bool = true) {
         aesKey = Self.derive(master, info: "Mimer/aes-gcm/v1")
         macKey = Self.derive(master, info: "Mimer/dedupe-hmac/v1")
+        isDurable = durable
     }
 
     private static func derive(_ master: SymmetricKey, info: String) -> SymmetricKey {
@@ -31,7 +38,10 @@ struct Cryptor {
     }
 
     /// The app-wide instance, keyed from the macOS Keychain (created on first run).
-    static let shared = Cryptor(key: KeychainKey.loadOrCreate())
+    static let shared: Cryptor = {
+        let k = KeychainKey.loadOrCreate()
+        return Cryptor(key: k.key, durable: k.durable)
+    }()
 
     func isEncrypted(_ stored: String) -> Bool { stored.hasPrefix(Self.prefix) }
 
@@ -91,27 +101,30 @@ enum KeychainKey {
     private static let service = "com.hasanjafri.Mimer"
     private static let account = "history-encryption-key-v1"
 
-    static func loadOrCreate() -> SymmetricKey {
-        if let data = load(), data.count == 32 { return SymmetricKey(data: data) }
+    /// Returns the master key and whether it is *durable* (persisted in the Keychain).
+    /// `durable == false` means an ephemeral fallback — the caller must degrade to a
+    /// non-destructive, in-memory-only session.
+    static func loadOrCreate() -> (key: SymmetricKey, durable: Bool) {
+        if let data = load(), data.count == 32 { return (SymmetricKey(data: data), true) }
 
         let key = SymmetricKey(size: .bits256)
         let data = key.withUnsafeBytes { Data(Array($0)) }
         let status = add(data)
         switch status {
         case errSecSuccess:
-            return key
+            return (key, true)
         case errSecDuplicateItem:
             // Raced with another launch, or a stale/invalid item exists.
-            if let existing = load(), existing.count == 32 { return SymmetricKey(data: existing) }
-            if update(data) { return key }
-            return ephemeral("could not replace an unusable Keychain item")
+            if let existing = load(), existing.count == 32 { return (SymmetricKey(data: existing), true) }
+            if update(data) { return (key, true) }
+            return (ephemeral("could not replace an unusable Keychain item"), false)
         default:
-            return ephemeral("Keychain add failed (OSStatus \(status))")
+            return (ephemeral("Keychain add failed (OSStatus \(status))"), false)
         }
     }
 
     private static func ephemeral(_ why: String) -> SymmetricKey {
-        NSLog("Mimer: CRITICAL — \(why); using an ephemeral key. Encrypted history will not survive a restart.")
+        NSLog("Mimer: CRITICAL — \(why); using an ephemeral key. New clips won't survive a restart, and existing encrypted history is left untouched (not migrated/scrubbed) until the Keychain recovers.")
         return SymmetricKey(size: .bits256)
     }
 
