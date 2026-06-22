@@ -42,7 +42,7 @@ Release — never let it ship). When running a Debug build it watches
 - **Inject** a clip: `printf 'text' | pbcopy`
 - **Drive**: write a command to `_debug_cmd` — `open`, `close`, `paste <i>`, `fav <i>`,
   `delete <i>`, `pause` / `resume`, `transform <i>`, `snippet <text>`, `settings`,
-  `composer`, `snapshot`.
+  `composer`, `snapshot`, `requestpaste` (trigger the macOS PostEvent prompt for auto-paste E2E).
 - **Inspect**: read `_debug_state.json` (clipCount, clips, favorites, paletteKey,
   firstResponder, canPostEvents, isPaused…).
 - **See the UI with no Screen Recording permission**: `snapshot` renders the app's own

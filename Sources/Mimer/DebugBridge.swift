@@ -8,7 +8,7 @@ import SwiftUI
 /// executes commands written to `_debug_cmd`. Never compiled into release builds.
 ///
 /// Commands (write one to _debug_cmd): `open`, `close`, `paste <i>`, `settings`,
-/// `fav <i>`, `delete <i>`, `pause`, `resume`, `snapshot`.
+/// `fav <i>`, `delete <i>`, `pause`, `resume`, `snapshot`, `requestpaste` (prompt for PostEvent).
 /// `snapshot` renders Mimer's own windows to PNGs in `_snapshots/` (no Screen
 /// Recording permission needed — the app draws itself). Inject clips for capture
 /// testing from the shell with `pbcopy` (no bridge needed).
@@ -75,6 +75,7 @@ final class DebugBridge {
         case "snippet":
             if parts.count > 1 { ClipStore.shared.addSnippet(parts[1]) }
         case "composer": SnippetComposerWindowController.shared.show()
+        case "requestpaste": _ = Paster.requestPostEventAccess()   // trigger the macOS PostEvent prompt (E2E harness)
         default: break
         }
     }
