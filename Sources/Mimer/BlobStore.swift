@@ -17,14 +17,18 @@ struct BlobStore: Sendable {
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
     }
 
-    /// hash is hex (HMAC) → a safe, traversal-free filename.
-    private func url(for hash: String) -> URL { dir.appendingPathComponent(hash) }
+    /// A blob URL only for a well-formed hash (64 lowercase hex = HMAC-SHA256). Anything else
+    /// (DB/sync tampering) → nil, so a stored value can never become a path-traversal filename.
+    private func url(for hash: String) -> URL? {
+        guard hash.range(of: #"^[0-9a-f]{64}$"#, options: .regularExpression) != nil else { return nil }
+        return dir.appendingPathComponent(hash)
+    }
 
     /// Store bytes, returning the content hash (the blob reference) or nil on failure.
     /// Idempotent: identical bytes map to the same file, so re-storing dedupes (no rewrite).
     func store(_ data: Data) -> String? {
         let hash = cryptor.dedupeHash(data)
-        let fileURL = url(for: hash)
+        guard let fileURL = url(for: hash) else { return nil }
         if FileManager.default.fileExists(atPath: fileURL.path) { return hash }   // dedupe
         guard let sealed = cryptor.seal(data) else {                              // fail closed
             NSLog("Mimer BlobStore: seal failed; not writing blob")
@@ -39,16 +43,20 @@ struct BlobStore: Sendable {
         }
     }
 
-    /// Load + decrypt a blob, or nil if missing/corrupt.
+    /// Load + decrypt a blob, or nil if missing/corrupt/malformed-hash.
     func load(_ hash: String) -> Data? {
-        guard let sealed = try? Data(contentsOf: url(for: hash)) else { return nil }
+        guard let fileURL = url(for: hash), let sealed = try? Data(contentsOf: fileURL) else { return nil }
         return cryptor.open(sealed)
     }
 
-    func exists(_ hash: String) -> Bool { FileManager.default.fileExists(atPath: url(for: hash).path) }
+    func exists(_ hash: String) -> Bool {
+        guard let fileURL = url(for: hash) else { return false }
+        return FileManager.default.fileExists(atPath: fileURL.path)
+    }
 
-    /// Remove a blob (called when its clip is pruned/deleted). Missing → no-op.
+    /// Remove a blob (called when its clip is pruned/deleted). Missing/malformed → no-op.
     func delete(_ hash: String) {
-        try? FileManager.default.removeItem(at: url(for: hash))
+        guard let fileURL = url(for: hash) else { return }
+        try? FileManager.default.removeItem(at: fileURL)
     }
 }

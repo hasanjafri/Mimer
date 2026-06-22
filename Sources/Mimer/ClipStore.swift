@@ -81,7 +81,9 @@ final class ClipStore: ObservableObject {
     /// then a row referencing them. Dedupes by the blob's keyed hash — re-copying the same image
     /// just moves the existing row to the top (no new blob, no new row).
     func insertImage(data: Data, sourceApp: String? = nil) {
-        guard let hash = blobStore.store(data) else { return }   // fail closed — no blob, no row
+        let hash = cryptor.dedupeHash(data)
+        let blobExistedBefore = blobStore.exists(hash)
+        guard blobStore.store(data) != nil else { return }   // fail closed — no blob, no row
         let now = Date()
 
         let request = Clip.fetch()
@@ -92,10 +94,14 @@ final class ClipStore: ObservableObject {
             existing.lastUsedAt = now
             existing.sourceApp = sourceApp.flatMap(cryptor.encrypt)
         } else {
+            guard let caption = cryptor.encrypt("Image") else {   // fail closed; don't persist an invisible row
+                if !blobExistedBefore { blobStore.delete(hash) }
+                return
+            }
             let clip = NSEntityDescription.insertNewObject(forEntityName: "Clip", into: context) as! Clip
             clip.id = UUID()
-            clip.text = cryptor.encrypt("Image")   // a searchable/display caption; the bytes live in the blob
-            clip.contentHash = hash                // dedupe key (== blobHash)
+            clip.text = caption          // a searchable/display caption; the bytes live in the blob
+            clip.contentHash = hash       // dedupe key (== blobHash)
             clip.blobHash = hash
             clip.kind = ClipKind.image.rawValue
             clip.createdAt = now
@@ -107,6 +113,8 @@ final class ClipStore: ObservableObject {
         if save() {
             prune()
             captureTick &+= 1
+        } else if !blobExistedBefore {
+            blobStore.delete(hash)   // row didn't persist → don't leave an orphaned blob we just wrote
         }
         refresh()
     }
@@ -131,40 +139,49 @@ final class ClipStore: ObservableObject {
         guard let clip = clip(with: id) else { return }
         let blob = clip.blobHash
         context.delete(clip)
-        save()
-        if let blob { blobStore.delete(blob) }   // remove the backing file too
+        guard save() else { refresh(); return }   // never touch blobs on a failed/rolled-back delete
+        if let blob, !isBlobReferenced(blob) { blobStore.delete(blob) }   // only when no row still uses it
         refresh()
+    }
+
+    /// True if any row still references this blob (so we don't delete a shared/still-used file).
+    private func isBlobReferenced(_ hash: String) -> Bool {
+        let r = Clip.fetch()
+        r.predicate = NSPredicate(format: "blobHash == %@", hash)
+        r.fetchLimit = 1
+        return ((try? context.count(for: r)) ?? 0) > 0
     }
 
     /// Wipe the rolling history. Favorites and snippets are kept (they're explicitly saved).
     func clearHistory() {
         let predicate = NSPredicate(format: "isFavorite == NO AND kind != %d", ClipKind.snippet.rawValue)
-        let blobs = blobHashes(predicate: predicate)   // collect before the rows vanish
         let request = NSFetchRequest<NSManagedObjectID>(entityName: "Clip")
         request.resultType = .managedObjectIDResultType
         request.predicate = predicate
         guard let ids = try? context.fetch(request), !ids.isEmpty else { return }
-        let batch = NSBatchDeleteRequest(objectIDs: ids)
-        batch.resultType = .resultTypeObjectIDs
-        if let result = try? context.execute(batch) as? NSBatchDeleteResult,
-           let deleted = result.result as? [NSManagedObjectID] {
-            NSManagedObjectContext.mergeChanges(fromRemoteContextSave: [NSDeletedObjectsKey: deleted], into: [context])
-        }
-        blobs.forEach(blobStore.delete)
+        batchDelete(ids)
         refresh()
     }
 
-    /// The non-nil blob references for rows matching `predicate` (+ optional sort/offset) — used
-    /// to delete blob files alongside the rows in batch deletes.
-    private func blobHashes(predicate: NSPredicate, sort: [NSSortDescriptor] = [], offset: Int = 0) -> [String] {
-        let r = NSFetchRequest<NSDictionary>(entityName: "Clip")
-        r.resultType = .dictionaryResultType
-        r.includesPendingChanges = false
-        r.predicate = predicate
-        r.sortDescriptors = sort
-        r.fetchOffset = offset
-        r.propertiesToFetch = ["blobHash"]
-        return ((try? context.fetch(r)) ?? []).compactMap { $0["blobHash"] as? String }
+    /// Batch-delete the given rows, then delete the blob files of *exactly* those rows — but
+    /// only after the delete is confirmed, and only for blobs no surviving row still references.
+    private func batchDelete(_ ids: [NSManagedObjectID]) {
+        let blobs = blobHashes(forObjectIDs: ids)   // captured before the rows vanish
+        let batch = NSBatchDeleteRequest(objectIDs: ids)
+        batch.resultType = .resultTypeObjectIDs
+        guard let result = try? context.execute(batch) as? NSBatchDeleteResult,
+              let deleted = result.result as? [NSManagedObjectID], !deleted.isEmpty else { return }
+        NSManagedObjectContext.mergeChanges(fromRemoteContextSave: [NSDeletedObjectsKey: deleted], into: [context])
+        for blob in blobs where !isBlobReferenced(blob) { blobStore.delete(blob) }
+    }
+
+    /// The non-nil blob references of *exactly* the given rows (so blob deletion is tied to the
+    /// rows actually being removed, not a predicate/offset replay that could shift).
+    private func blobHashes(forObjectIDs ids: [NSManagedObjectID]) -> [String] {
+        guard !ids.isEmpty else { return [] }
+        let r = Clip.fetch()
+        r.predicate = NSPredicate(format: "self IN %@", ids)
+        return ((try? context.fetch(r)) ?? []).compactMap(\.blobHash)
     }
 
     /// Save an authored snippet (kept forever, exempt from pruning). Identical
@@ -214,25 +231,7 @@ final class ClipStore: ObservableObject {
         idRequest.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: false)]
 
         guard let ids = try? context.fetch(idRequest), ids.count > limit else { return }
-        let overflow = Array(ids[limit...])
-
-        // Blob references of exactly the overflow rows (same predicate+sort, skip the kept ones).
-        let blobs = blobHashes(
-            predicate: NSPredicate(format: "isFavorite == NO AND kind != %d", ClipKind.snippet.rawValue),
-            sort: [NSSortDescriptor(key: "createdAt", ascending: false)],
-            offset: limit
-        )
-
-        let batch = NSBatchDeleteRequest(objectIDs: overflow)
-        batch.resultType = .resultTypeObjectIDs
-        if let result = try? context.execute(batch) as? NSBatchDeleteResult,
-           let deleted = result.result as? [NSManagedObjectID], !deleted.isEmpty {
-            NSManagedObjectContext.mergeChanges(
-                fromRemoteContextSave: [NSDeletedObjectsKey: deleted],
-                into: [context]
-            )
-        }
-        blobs.forEach(blobStore.delete)   // remove the pruned images' backing files
+        batchDelete(Array(ids[limit...]))   // delete the overflow rows + their blob files
     }
 
     @discardableResult
