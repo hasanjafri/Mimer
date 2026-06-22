@@ -23,11 +23,13 @@ final class ClipStore: ObservableObject {
 
     private let persistence: PersistenceController
     private let cryptor: Cryptor
+    private let blobStore: BlobStore
     private var context: NSManagedObjectContext { persistence.viewContext }
 
-    init(persistence: PersistenceController = .shared, cryptor: Cryptor = .shared) {
+    init(persistence: PersistenceController = .shared, cryptor: Cryptor = .shared, blobStore: BlobStore = BlobStore()) {
         self.persistence = persistence
         self.cryptor = cryptor
+        self.blobStore = blobStore
     }
 
     func loadInitial() {
@@ -75,6 +77,52 @@ final class ClipStore: ObservableObject {
         refresh()
     }
 
+    /// Capture an image clip: write the (encrypted, content-addressed) bytes to the blob store,
+    /// then a row referencing them. Dedupes by the blob's keyed hash — re-copying the same image
+    /// just moves the existing row to the top (no new blob, no new row).
+    func insertImage(data: Data, sourceApp: String? = nil) {
+        let hash = blobStore.hash(for: data)                 // the blob store owns the key (filename)
+        let blobExistedBefore = blobStore.exists(hash)
+        guard blobStore.store(data) == hash else { return }  // fail closed; persist exactly what's stored
+        let now = Date()
+
+        let request = Clip.fetch()
+        request.predicate = NSPredicate(format: "blobHash == %@", hash)
+        request.fetchLimit = 1
+        if let existing = (try? context.fetch(request))?.first {
+            existing.createdAt = now
+            existing.lastUsedAt = now
+            existing.sourceApp = sourceApp.flatMap(cryptor.encrypt)
+        } else {
+            guard let caption = cryptor.encrypt("Image") else {   // fail closed; don't persist an invisible row
+                if !blobExistedBefore { blobStore.delete(hash) }
+                return
+            }
+            let clip = NSEntityDescription.insertNewObject(forEntityName: "Clip", into: context) as! Clip
+            clip.id = UUID()
+            clip.text = caption          // a searchable/display caption; the bytes live in the blob
+            clip.contentHash = hash       // dedupe key (== blobHash)
+            clip.blobHash = hash
+            clip.kind = ClipKind.image.rawValue
+            clip.createdAt = now
+            clip.lastUsedAt = now
+            clip.isFavorite = false
+            clip.sourceApp = sourceApp.flatMap(cryptor.encrypt)
+        }
+
+        if save() {
+            prune()
+            captureTick &+= 1
+        } else if !blobExistedBefore {
+            blobStore.delete(hash)   // row didn't persist → don't leave an orphaned blob we just wrote
+        }
+        refresh()
+    }
+
+    /// Decrypted bytes for an image clip's blob (nil if missing/corrupt). Used by the UI to
+    /// render thumbnails and by paste-back to put the image on the pasteboard.
+    func blobData(_ hash: String) -> Data? { blobStore.load(hash) }
+
     func toggleFavorite(_ id: UUID) {
         guard let clip = clip(with: id) else { return }
         clip.isFavorite.toggle()
@@ -89,23 +137,58 @@ final class ClipStore: ObservableObject {
 
     func delete(_ id: UUID) {
         guard let clip = clip(with: id) else { return }
+        let blob = clip.blobHash
         context.delete(clip)
-        save(); refresh()
+        guard save() else { refresh(); return }   // never touch blobs on a failed/rolled-back delete
+        if let blob, !isBlobReferenced(blob) { blobStore.delete(blob) }   // only when no row still uses it
+        refresh()
+    }
+
+    /// True if any row still references this blob (so we don't delete a shared/still-used file).
+    private func isBlobReferenced(_ hash: String) -> Bool {
+        let r = Clip.fetch()
+        r.predicate = NSPredicate(format: "blobHash == %@", hash)
+        r.fetchLimit = 1
+        return ((try? context.count(for: r)) ?? 0) > 0
     }
 
     /// Wipe the rolling history. Favorites and snippets are kept (they're explicitly saved).
     func clearHistory() {
+        let predicate = NSPredicate(format: "isFavorite == NO AND kind != %d", ClipKind.snippet.rawValue)
         let request = NSFetchRequest<NSManagedObjectID>(entityName: "Clip")
         request.resultType = .managedObjectIDResultType
-        request.predicate = NSPredicate(format: "isFavorite == NO AND kind != %d", ClipKind.snippet.rawValue)
+        request.predicate = predicate
         guard let ids = try? context.fetch(request), !ids.isEmpty else { return }
+        batchDelete(ids)
+        refresh()
+    }
+
+    /// Batch-delete the given rows, then delete the blob files of *exactly the rows the store
+    /// confirmed deleted* — and only for blobs no surviving row still references.
+    private func batchDelete(_ ids: [NSManagedObjectID]) {
+        let hashByID = blobHashesByID(ids)   // (objectID → blobHash) captured before the rows vanish
         let batch = NSBatchDeleteRequest(objectIDs: ids)
         batch.resultType = .resultTypeObjectIDs
-        if let result = try? context.execute(batch) as? NSBatchDeleteResult,
-           let deleted = result.result as? [NSManagedObjectID] {
-            NSManagedObjectContext.mergeChanges(fromRemoteContextSave: [NSDeletedObjectsKey: deleted], into: [context])
+        guard let result = try? context.execute(batch) as? NSBatchDeleteResult,
+              let deleted = result.result as? [NSManagedObjectID], !deleted.isEmpty else { return }
+        NSManagedObjectContext.mergeChanges(fromRemoteContextSave: [NSDeletedObjectsKey: deleted], into: [context])
+        // Only clean blobs whose row was actually deleted (not merely requested).
+        let confirmed = Set(deleted)
+        let blobs = Set(hashByID.compactMap { confirmed.contains($0.key) ? $0.value : nil })
+        for blob in blobs where !isBlobReferenced(blob) { blobStore.delete(blob) }
+    }
+
+    /// Map of objectID → non-nil blobHash for *exactly* the given rows, so blob deletion can be
+    /// keyed to the rows the store confirms it deleted (not a predicate/offset replay that shifts).
+    private func blobHashesByID(_ ids: [NSManagedObjectID]) -> [NSManagedObjectID: String] {
+        guard !ids.isEmpty else { return [:] }
+        let r = Clip.fetch()
+        r.predicate = NSPredicate(format: "self IN %@", ids)
+        var map: [NSManagedObjectID: String] = [:]
+        for clip in (try? context.fetch(r)) ?? [] where clip.blobHash != nil {
+            map[clip.objectID] = clip.blobHash
         }
-        refresh()
+        return map
     }
 
     /// Save an authored snippet (kept forever, exempt from pruning). Identical
@@ -155,17 +238,7 @@ final class ClipStore: ObservableObject {
         idRequest.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: false)]
 
         guard let ids = try? context.fetch(idRequest), ids.count > limit else { return }
-        let overflow = Array(ids[limit...])
-
-        let batch = NSBatchDeleteRequest(objectIDs: overflow)
-        batch.resultType = .resultTypeObjectIDs
-        if let result = try? context.execute(batch) as? NSBatchDeleteResult,
-           let deleted = result.result as? [NSManagedObjectID], !deleted.isEmpty {
-            NSManagedObjectContext.mergeChanges(
-                fromRemoteContextSave: [NSDeletedObjectsKey: deleted],
-                into: [context]
-            )
-        }
+        batchDelete(Array(ids[limit...]))   // delete the overflow rows + their blob files
     }
 
     @discardableResult
@@ -203,7 +276,7 @@ final class ClipStore: ObservableObject {
         request.resultType = .dictionaryResultType
         request.includesPendingChanges = false
         request.predicate = predicate
-        request.propertiesToFetch = ["id", "text", "kind", "createdAt", "isFavorite", "sourceApp"]
+        request.propertiesToFetch = ["id", "text", "kind", "createdAt", "isFavorite", "sourceApp", "blobHash"]
         request.sortDescriptors = sort
         let rows = (try? context.fetch(request)) ?? []
         return rows.compactMap { row in
@@ -222,7 +295,8 @@ final class ClipStore: ObservableObject {
                 kind: ClipKind(rawValue: kindRaw) ?? .text,
                 createdAt: createdAt,
                 isFavorite: isFavorite,
-                sourceApp: (row["sourceApp"] as? String).flatMap(cryptor.decrypt)
+                sourceApp: (row["sourceApp"] as? String).flatMap(cryptor.decrypt),
+                blobHash: row["blobHash"] as? String
             )
         }
     }

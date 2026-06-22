@@ -72,9 +72,11 @@ images; concurrency machinery sits just before the image/OCR work that needs it.
    `MainActor.assumeIsolated`. No runtime change yet. Still to do (with image capture): the
    background `NSManagedObjectContext` + serial worker so capture/hash/thumbnail run off-main,
    with `ClipItem` as the only actor-crossing type — then the Swift 6 language-mode flip.
-6. **Image clips** — file-backed, content-addressed `SHA256(raw bytes)`, `CGImageSource`
-   thumbnails, lazy full image, **blob cleanup in prune/delete + orphan sweep**,
-   main-thread atomic snapshot then off-main hash/thumbnail.
+6. **Image clips** — *storage layer shipped (7a):* `BlobStore` (encrypted, content-addressed
+   by keyed HMAC, dedupe), `Clip.blobHash` + kind `.image`, `ClipStore.insertImage(data:)`,
+   and **blob cleanup in prune/delete/clearHistory**. Next: **7b** capture from the pasteboard
+   + `CGImageSource` thumbnails in the rows (main-thread snapshot → off-main hash/thumbnail),
+   **7c** paste-back. (Orphan sweep + lazy full-image as follow-ups.)
 7. **File clips** (security-scoped bookmarks).
 8. **Type filters + metadata detail view.**
 9. **OCR** (optional/late) — async/off-main, downsample-before-Vision, tri-state, cancel-on-delete.
