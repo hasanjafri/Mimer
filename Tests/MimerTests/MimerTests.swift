@@ -66,6 +66,46 @@ final class ClipboardMonitorTests: XCTestCase {
         XCTAssertTrue(captured().isEmpty)
     }
 
+    func testDiscardsCopiesMadeWhileExcludedAppActive() {
+        let pb = NSPasteboard(name: NSPasteboard.Name("MimerExcl-\(UUID().uuidString)"))
+        pb.clearContents()
+        var captured: [String] = []
+        let m = ClipboardMonitor(pasteboard: pb, onCapture: { captured.append($0) },
+                                 isExcluded: { $0 == "com.test.excluded" })
+        m.handleFrontmostChange(newBundleID: "com.test.excluded")          // excluded app active
+        pb.clearContents(); pb.setString("secret-from-excluded", forType: .string)   // it copies
+        m.handleFrontmostChange(newBundleID: "com.apple.Safari")           // focus leaves it
+        XCTAssertFalse(m.captureIfChanged())   // the excluded copy is discarded (poll-tick race closed)
+        XCTAssertTrue(captured.isEmpty)
+    }
+
+    func testFailsClosedWhenExcludedAppStillCurrentAtTick() {
+        // The losing interleaving: excluded app copied, focus is leaving it, but the capture
+        // tick fires BEFORE the (async) activation handler advances lastChangeCount. The cached
+        // currentAppExcluded must still block capture.
+        let pb = NSPasteboard(name: NSPasteboard.Name("MimerExcl-\(UUID().uuidString)"))
+        pb.clearContents()
+        var captured: [String] = []
+        let m = ClipboardMonitor(pasteboard: pb, onCapture: { captured.append($0) },
+                                 isExcluded: { $0 == "com.test.excluded" })
+        m.handleFrontmostChange(newBundleID: "com.test.excluded")          // excluded app active
+        pb.clearContents(); pb.setString("secret-while-excluded", forType: .string)
+        XCTAssertFalse(m.captureIfChanged())   // tick before the leave-handler → fail closed
+        XCTAssertTrue(captured.isEmpty)
+    }
+
+    func testCapturesCopiesMadeWhileNormalAppActive() {
+        let pb = NSPasteboard(name: NSPasteboard.Name("MimerExcl-\(UUID().uuidString)"))
+        pb.clearContents()
+        var captured: [String] = []
+        let m = ClipboardMonitor(pasteboard: pb, onCapture: { captured.append($0) },
+                                 isExcluded: { $0 == "com.test.excluded" })
+        m.handleFrontmostChange(newBundleID: "com.apple.Safari")           // normal app active
+        pb.clearContents(); pb.setString("normal clip", forType: .string)
+        XCTAssertTrue(m.captureIfChanged())    // captured normally
+        XCTAssertEqual(captured, ["normal clip"])
+    }
+
     func testIgnoresEmptyAndWhitespace() {
         let (m, pb, captured) = makeMonitor()
         pb.clearContents(); pb.setString("   \n ", forType: .string)

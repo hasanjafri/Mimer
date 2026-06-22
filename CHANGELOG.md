@@ -23,6 +23,7 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Fixed
 - **Security:** auto-paste now re-verifies the target app is still frontmost before posting ⌘V, so a clip can't land in an app that stole focus.
 - **Security:** with an unusable Keychain (ephemeral key) the store runs non-destructively — never migrating, vacuuming, or pruning away still-recoverable data.
+- **Security:** excluded / password-manager apps are now honored even across a fast focus switch — a copy made there is discarded when focus leaves, closing the poll-tick race.
 - Settings window no longer clips its taller panes; menu rows are a uniform height so image rows don't mis-size the menu.
 
 ## [0.2.1] - 2026-06-21

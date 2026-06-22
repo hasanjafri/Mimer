@@ -25,15 +25,19 @@ enum CaptureGate {
         "com.markmcguill.strongbox.mac"
     ]
 
+    /// Whether this specific app (by bundle id) is one we must never record from — the
+    /// password-manager blocklist plus the user's exclusions. App-identity only (pause is
+    /// separate), so the monitor can use it on app-activation events as well as at capture time.
+    @MainActor
+    static func isExcludedApp(_ bundleID: String?) -> Bool {
+        guard let bundleID, !bundleID.isEmpty else { return false }
+        return passwordManagerBundleIDs.contains(bundleID) || Preferences.shared.excludedBundleIDs.contains(bundleID)
+    }
+
     /// Evaluated at capture time (main thread, from the monitor's timer).
     @MainActor
     static func captureAllowed() -> Bool {
         if Preferences.shared.isPaused { return false }
-        let frontID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? ""
-        if !frontID.isEmpty {
-            if passwordManagerBundleIDs.contains(frontID) { return false }
-            if Preferences.shared.excludedBundleIDs.contains(frontID) { return false }
-        }
-        return true
+        return !isExcludedApp(NSWorkspace.shared.frontmostApplication?.bundleIdentifier)
     }
 }

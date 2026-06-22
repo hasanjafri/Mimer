@@ -76,7 +76,11 @@ Typical loop: edit → `xcodebuild build` → relaunch the Debug app → drive v
   posting ⌘V (`CommandPalettePanel.activateThenPaste`, same guard as the paste-stack) — if
   focus moved, the clip stays on the clipboard rather than pasting into the wrong app.
 - `CaptureGate` — pause + per-app exclusions + a password-manager bundle blocklist
-  (belt-and-suspenders with ConcealedType, which is the primary defense).
+  (belt-and-suspenders with ConcealedType, which is the primary defense); `isExcludedApp(_:)`
+  is the app-identity check shared by the capture gate and the monitor. The monitor also watches
+  `NSWorkspace` activation and, when focus leaves an excluded app, advances `lastChangeCount` to
+  **discard whatever that app copied** — closing the poll-tick race where a plain-string copy in
+  an excluded app could be captured after switching away.
 - `Clip.sourceApp` — localized name of the frontmost app at capture time (best-effort, read
   from `NSWorkspace` in the monitor's `onCapture`; Mimer's own bundle → nil). Additive,
   optional, **encrypted** like `text` (so the sqlite stays ciphertext-only); `app:` filtering
