@@ -12,7 +12,7 @@ it's a fast command palette that understands what you copied and can transform i
   <img src="docs/media/hero.png" alt="Mimer command palette showing type-aware clipboard history" width="640">
 </p>
 
-> Status: **v0.2.1 — live.** Notarized, Homebrew-installable, and auto-updating via
+> Status: **v0.2.2 — live.** Notarized, Homebrew-installable, and auto-updating via
 > Sparkle. See [CHANGELOG.md](CHANGELOG.md) for what's new and [docs/ROADMAP.md](docs/ROADMAP.md) for what's next.
 
 ---
