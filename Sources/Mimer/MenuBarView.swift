@@ -11,7 +11,7 @@ struct MenuBarView: View {
     @State private var copiedID: UUID?
     @State private var copyGeneration = 0
 
-    private let rowHeight: CGFloat = 30
+    private let rowHeight: CGFloat = 34   // fits the 22pt thumbnail + insets; rows are framed to this so listHeight is exact
 
     #if DEBUG
     private let debugFlatList: Bool
@@ -154,7 +154,7 @@ struct MenuBarView: View {
             .help(item.isFavorite ? "Unfavorite" : "Favorite (kept forever)")
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 6)
+        .frame(height: rowHeight)   // uniform row height so the menu's listHeight math is exact (image rows no longer clip)
         .background(
             isCopied ? Color.green.opacity(0.18)
                      : (isHovered ? Color.primary.opacity(0.08) : .clear),
