@@ -38,7 +38,7 @@ one-keystroke transforms — all local-first, no subscription, MIT-licensed.
 - **Quick-paste (⌘1–⌘9)** — grab one of the top results instantly.
 - **Paste-stack** — press **⇥** to queue several clips (numbered in order), then **⇧⏎** to paste them all in sequence — great for filling forms or assembling something from parts.
 - **Type-aware clips** — links, code, colors, **git SHAs, issue keys (`ABC-123`), and file paths / stack-trace `file:line`** each get their own glyph; hex colors show a live swatch.
-- **⌘O — act on a clip** — context-aware, no setup: reveal a masked secret, open a link in your browser, or reveal a file path / `file:line` in Finder. (Opening commits/issues/editors lands in a later release.)
+- **⌘O — act on a clip** — context-aware: reveal a masked secret, open a link in your browser, or reveal a file path / `file:line` in Finder. Set a git remote, issue tracker, or editor in **Settings → Developer** and ⌘O also opens a commit SHA's page, an issue key in your tracker, or a `file:line` in VS Code/Cursor.
 - **⌘K transforms** — for the selected clip, each with a live preview and shown only when it applies:
   - *General:* `UPPER`/`lower`/`Title`, `camelCase`/`snake_case`, trim, slugify, Base64 encode/decode, URL encode/decode, JSON pretty-print/minify.
   - *Lists:* sort lines, dedupe lines, reverse lines.

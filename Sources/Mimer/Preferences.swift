@@ -36,6 +36,30 @@ final class Preferences: ObservableObject {
         didSet { defaults.set(maskSecrets, forKey: Keys.maskSecrets) }
     }
 
+    // MARK: - Developer integrations (⌘O "act on") — all optional/empty by default.
+
+    /// Remote base for git-SHA clips, e.g. `github.com/acme/app` → opens `…/commit/<sha>`.
+    @Published var gitRemoteBase: String {
+        didSet { defaults.set(gitRemoteBase, forKey: Keys.gitRemoteBase) }
+    }
+    /// Issue-tracker URL with a `{KEY}` placeholder, e.g. `https://acme.atlassian.net/browse/{KEY}`.
+    @Published var issueTrackerTemplate: String {
+        didSet { defaults.set(issueTrackerTemplate, forKey: Keys.issueTrackerTemplate) }
+    }
+    /// Editor for `file:line` clips ("" = none, else a `ClipAction.DevConfig.Editor` raw value).
+    @Published var editorKind: String {
+        didSet { defaults.set(editorKind, forKey: Keys.editorKind) }
+    }
+
+    /// The structured config consumed by `ClipAction` (empty/invalid fields → disabled).
+    var devConfig: ClipAction.DevConfig {
+        ClipAction.DevConfig(
+            gitRemoteBase: gitRemoteBase.trimmingCharacters(in: .whitespaces).isEmpty ? nil : gitRemoteBase,
+            issueTrackerTemplate: issueTrackerTemplate.contains("{KEY}") ? issueTrackerTemplate : nil,
+            editor: ClipAction.DevConfig.Editor(rawValue: editorKind)
+        )
+    }
+
     private let defaults = UserDefaults.standard
     private enum Keys {
         static let historyLimit = "historyLimit"
@@ -44,6 +68,9 @@ final class Preferences: ObservableObject {
         static let isPaused = "isPaused"
         static let excludedBundleIDs = "excludedBundleIDs"
         static let maskSecrets = "maskSecrets"
+        static let gitRemoteBase = "gitRemoteBase"
+        static let issueTrackerTemplate = "issueTrackerTemplate"
+        static let editorKind = "editorKind"
     }
 
     private init() {
@@ -53,5 +80,8 @@ final class Preferences: ObservableObject {
         isPaused = defaults.bool(forKey: Keys.isPaused)
         excludedBundleIDs = Set(defaults.stringArray(forKey: Keys.excludedBundleIDs) ?? [])
         maskSecrets = defaults.object(forKey: Keys.maskSecrets) as? Bool ?? true   // default on
+        gitRemoteBase = defaults.string(forKey: Keys.gitRemoteBase) ?? ""
+        issueTrackerTemplate = defaults.string(forKey: Keys.issueTrackerTemplate) ?? ""
+        editorKind = defaults.string(forKey: Keys.editorKind) ?? ""
     }
 }

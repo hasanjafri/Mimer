@@ -421,21 +421,27 @@ struct PaletteView: View {
         store.delete(id)
     }
 
-    /// The context-aware action (⌘O) for the selected clip, or nil. Computed live from text.
+    /// The context-aware action (⌘O) for the selected clip, or nil. Computed live from text
+    /// + the user's developer-integration config.
     private var selectedAction: ClipAction? {
         guard transformTarget == nil, results.indices.contains(selection) else { return nil }
-        return ClipAction.of(results[selection].text)
+        return ClipAction.of(results[selection].text, config: prefs.devConfig)
     }
 
     private func actOnSelected() {
         guard results.indices.contains(selection) else { return }
         let item = results[selection]
-        switch ClipAction.of(item.text) {
+        switch ClipAction.of(item.text, config: prefs.devConfig) {
         case .revealSecret:
             if revealedSecrets.contains(item.id) { revealedSecrets.remove(item.id) }
             else { revealedSecrets.insert(item.id) }
-        case .openURL(let url):
-            NSWorkspace.shared.open(url)
+        case .open(let url, _):
+            // Defense-in-depth: only ever open a known-safe scheme, even though every
+            // ClipAction constructor already validates (http/https links, vscode/cursor editor).
+            let allowed: Set<String> = ["http", "https", "vscode", "cursor"]
+            if let scheme = url.scheme?.lowercased(), allowed.contains(scheme) {
+                NSWorkspace.shared.open(url)
+            }
             onClose()
         case .revealInFinder(let url):
             NSWorkspace.shared.activateFileViewerSelecting([url])

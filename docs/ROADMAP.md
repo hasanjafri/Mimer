@@ -49,10 +49,11 @@ images; concurrency machinery sits just before the image/OCR work that needs it.
    is local/no-cloud and devs re-paste secrets, so the full value is stored + pasted, only
    the display is masked; toggle in Privacy). Also shipped: **type detection** (git SHA /
    issue key `ABC-123` / file ref incl. stack-trace `path:line:col`) with row icons, and a
-   config-free **⌘O "act on"** (`ClipAction`): reveal-on-demand for secrets · open http/https
-   links · reveal an existing file path in Finder — all derived live from text so old clips
-   work too. Deferred (needs config): open commit on a remote · open issue in a tracker ·
-   open `file:line` in an editor — a later PR with a Settings → Developer pane.
+   **⌘O "act on"** (`ClipAction`): reveal-on-demand for secrets · open http/https links ·
+   reveal a file in Finder — all derived live from text so old clips work too. *Now also
+   shipped:* the configurable integrations via **Settings → Developer** (`Preferences.devConfig`)
+   — git SHA → open commit on a remote · issue key → open in a `{KEY}` tracker · `file:line` →
+   open in VS Code/Cursor. **Bucket #2 complete.**
 3. **Scoped/regex search + paste-stack**. *Shipped.* Search (`SearchQuery`): `type:<kind>`,
    `type:secret`/`is:secret` (live), `is:fav`, `app:<name>` (source app — captured in
    `Clip.sourceApp`, shown in the row), and `/regex/`, composable with fuzzy text. Paste-stack
