@@ -32,7 +32,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let monitor = ClipboardMonitor(
             shouldCapture: { CaptureGate.captureAllowed() },
             onCapture: { text in ClipStore.shared.insert(text: text, sourceApp: sourceApp()) },
-            onCaptureImage: { data in ClipStore.shared.insertImage(data: data, sourceApp: sourceApp()) }
+            onCaptureImage: { data in ClipStore.shared.insertImage(data: data, sourceApp: sourceApp()) },
+            isExcluded: { CaptureGate.isExcludedApp($0) }
         )
         monitor.start()
         self.monitor = monitor

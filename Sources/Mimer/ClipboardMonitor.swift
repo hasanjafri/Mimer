@@ -10,8 +10,15 @@ final class ClipboardMonitor {
     private let shouldCapture: () -> Bool
     private let onCapture: (String) -> Void
     private let onCaptureImage: (Data) -> Void
+    private let isExcluded: (String?) -> Bool
     private var timer: Timer?
+    private var activationObserver: NSObjectProtocol?
     private var lastChangeCount: Int
+    /// Whether the app that's currently frontmost is one we never record from. Tracked from
+    /// activation events so a copy made *inside* an excluded app can be discarded the moment
+    /// focus leaves it — before the 0.5s poll tick (which samples the new, allowed frontmost app)
+    /// could capture it.
+    private var currentAppExcluded = false
 
     /// Pasteboard markers we must never capture (passwords, transient, generated).
     private let ignoredTypes: Set<String> = [
@@ -24,17 +31,43 @@ final class ClipboardMonitor {
     init(pasteboard: NSPasteboard = .general,
          shouldCapture: @escaping () -> Bool = { true },
          onCapture: @escaping (String) -> Void,
-         onCaptureImage: @escaping (Data) -> Void = { _ in }) {
+         onCaptureImage: @escaping (Data) -> Void = { _ in },
+         isExcluded: @escaping (String?) -> Bool = { _ in false }) {
         self.pasteboard = pasteboard
         self.shouldCapture = shouldCapture
         self.onCapture = onCapture
         self.onCaptureImage = onCaptureImage
+        self.isExcluded = isExcluded
         self.lastChangeCount = pasteboard.changeCount
+    }
+
+    deinit {
+        if let activationObserver { NSWorkspace.shared.notificationCenter.removeObserver(activationObserver) }
+    }
+
+    /// Discard anything an excluded app put on the pasteboard once focus leaves it, so a copy
+    /// made inside (e.g.) a password manager isn't captured after switching to a normal app.
+    /// Internal for tests. `newBundleID` is the app that just became frontmost.
+    func handleFrontmostChange(newBundleID: String?) {
+        let nowExcluded = isExcluded(newBundleID)
+        if currentAppExcluded && !nowExcluded {
+            lastChangeCount = pasteboard.changeCount   // skip whatever the excluded app copied
+        }
+        currentAppExcluded = nowExcluded
     }
 
     func start() {
         guard timer == nil else { return }
         lastChangeCount = pasteboard.changeCount
+        currentAppExcluded = isExcluded(NSWorkspace.shared.frontmostApplication?.bundleIdentifier)
+        activationObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
+        ) { [weak self] note in
+            MainActor.assumeIsolated {
+                let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
+                self?.handleFrontmostChange(newBundleID: app?.bundleIdentifier)
+            }
+        }
         // Run in .common modes so polling keeps firing during tracking loops
         // (menu open, dragging the palette) instead of stalling in .default.
         let timer = Timer(timeInterval: 0.5, repeats: true) { [weak self] _ in
@@ -52,18 +85,20 @@ final class ClipboardMonitor {
         let changeCount = pasteboard.changeCount
         guard changeCount != lastChangeCount else { return false }
 
+        let types = Set((pasteboard.types ?? []).map(\.rawValue))
+        // Skip ignored markers (concealed/transient/auto-generated/our-own-paste) BEFORE reading
+        // the value — never materialize a password-manager string into memory.
+        guard types.isDisjoint(with: ignoredTypes) else { lastChangeCount = changeCount; return false }
+
         // Read the cheap text representation, then re-check changeCount: if it advanced mid-read,
         // the pasteboard was rewritten under us — discard and let the next tick re-capture.
-        let types = Set((pasteboard.types ?? []).map(\.rawValue))
         let text = pasteboard.string(forType: .string)
         guard pasteboard.changeCount == changeCount else { return false }
 
         lastChangeCount = changeCount
 
-        // Apply the capture gate BEFORE materializing any (potentially large/sensitive) image
-        // bytes — never read a password-manager / excluded-app / self-paste image into memory.
+        // Capture gate (pause / excluded-app / password-manager) before materializing image bytes.
         guard shouldCapture() else { return false }
-        guard types.isDisjoint(with: ignoredTypes) else { return false }
 
         let trimmed = text?.trimmingCharacters(in: .whitespacesAndNewlines)
         let hasImage = types.contains(NSPasteboard.PasteboardType.png.rawValue)
