@@ -1,0 +1,30 @@
+name: Feature request
+description: Suggest an idea for Mimer
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: The pain or workflow gap — not just the proposed solution.
+      placeholder: When I copy a long JSON blob I can't …
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What you'd like
+      description: How you imagine it working. Mockups/keyboard flows welcome.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives or prior art (optional)
+      description: How other clipboard managers handle it, or workarounds you've tried.
+  - type: checkboxes
+    id: fit
+    attributes:
+      label: Fit
+      options:
+        - label: This keeps Mimer local-first and private (no cloud/telemetry dependency).

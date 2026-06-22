@@ -118,6 +118,12 @@ global hotkey. The Xcode project is generated from `project.yml` via
 [XcodeGen](https://github.com/yonaskolb/XcodeGen) (so the `.xcodeproj` is not
 committed). See [`docs/`](docs/) for the research, design, plan, and reviews.
 
+## Contributing
+
+Issues and PRs welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for build/test (run
+`xcodegen generate` first), [CHANGELOG.md](CHANGELOG.md) for what's changed, and
+[SECURITY.md](SECURITY.md) to report anything security-sensitive privately.
+
 ## License
 
 [MIT](LICENSE) — © 2026 Hasan Jafri.

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/hasanjafri/Mimer/security/advisories/new
+    about: Report security issues privately, not as a public issue (see SECURITY.md).
+  - name: Question or idea (discussion)
+    url: https://github.com/hasanjafri/Mimer/discussions
+    about: For open-ended questions and discussion.
