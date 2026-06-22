@@ -33,12 +33,19 @@ final class ClipStore: ObservableObject {
     }
 
     func loadInitial() {
-        migrateToEncryptedIfNeeded()
-        // Vacuum if a migration just ran OR a prior launch encrypted rows but crashed
-        // before scrubbing (the pending marker survives that). Clear the marker only on a
-        // confirmed scrub — otherwise leave it set so a failed vacuum retries next launch.
-        if persistence.vacuumPending, persistence.vacuum() {
-            persistence.clearVacuumPending()
+        // With an ephemeral key (Keychain unusable) the key won't survive a restart, so we run
+        // non-destructively: never migrate legacy plaintext into ciphertext we can't read back
+        // (that would scrub still-recoverable data), and never vacuum (the pending marker stays
+        // set for a future durable launch to finish the job). New clips still persist, but they
+        // simply won't decrypt next launch — graceful loss, never corruption of existing data.
+        if cryptor.isDurable {
+            migrateToEncryptedIfNeeded()
+            // Vacuum if a migration just ran OR a prior launch encrypted rows but crashed
+            // before scrubbing (the pending marker survives that). Clear the marker only on a
+            // confirmed scrub — otherwise leave it set so a failed vacuum retries next launch.
+            if persistence.vacuumPending, persistence.vacuum() {
+                persistence.clearVacuumPending()
+            }
         }
         refresh()
     }
@@ -229,6 +236,10 @@ final class ClipStore: ObservableObject {
     /// IDs (no full-object faulting), then batch-deletes the overflow and merges
     /// the deletions back into the view context.
     private func prune() {
+        // Never evict under an ephemeral key: pruning would batch-delete older *durable*
+        // (still-recoverable) rows + blobs to make room for clips we can't read back. Let the
+        // history grow this session; a future durable launch prunes normally.
+        guard cryptor.isDurable else { return }
         let limit = max(0, historyLimitOverride ?? Preferences.shared.historyLimit)
 
         let idRequest = NSFetchRequest<NSManagedObjectID>(entityName: "Clip")
