@@ -13,7 +13,8 @@ it's a fast command palette that understands what you copied and can transform i
 </p>
 
 > Status: **v0.2.2 — live.** Notarized, Homebrew-installable, and auto-updating via
-> Sparkle. See [CHANGELOG.md](CHANGELOG.md) for what's new and [docs/ROADMAP.md](docs/ROADMAP.md) for what's next.
+> Sparkle. **Website:** [hasanjafri.github.io/Mimer](https://hasanjafri.github.io/Mimer/) ·
+> See [CHANGELOG.md](CHANGELOG.md) for what's new and [docs/ROADMAP.md](docs/ROADMAP.md) for what's next.
 
 ---
 
@@ -28,7 +29,8 @@ live in all day; it should be fast, private, and free. So I made the one I wante
 - **Built for developers** — scoped search (`type:`, `app:`, `/regex/`), a paste-stack, and **⌘O** to open a commit / issue / `file:line` straight in your tools.
 - **Private by default** — local-only, no telemetry, no subscription; history is **encrypted at rest** and detected secrets are masked on screen.
 
-Free and open source (MIT) — and it stays that way.
+Free and open source (MIT) — and it stays that way. If you've used **Maccy** or
+**CopyClip**, think of Mimer as a free, faster, developer-focused alternative.
 
 ## Features
 
@@ -52,7 +54,6 @@ Free and open source (MIT) — and it stays that way.
 
 ### Everything else
 
-- **Clipboard history** — everything you copy, newest first, surviving restarts.
 - **Clipboard history** — everything you copy, newest first, surviving restarts; quick-paste a top result with **⌘1–⌘9**.
 - **Type-aware clips** — links, code, colors, **git SHAs, issue keys (`ABC-123`), and file paths / stack-trace `file:line`** each get their own glyph; hex colors show a live swatch.
 - **Image clips** — copied images are captured with a thumbnail in the list and pasted right back; like all clips, they're **encrypted at rest** (the blob files hold only ciphertext).

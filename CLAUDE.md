@@ -171,9 +171,19 @@ Typical loop: edit → `xcodebuild build` → relaunch the Debug app → drive v
   marketing version sorts below an earlier integer build and breaks updates).
 - Local release still works: `./scripts/release.sh <version>` (uses the keychain
   `mimer-notary` profile + Sparkle key; in CI the Sparkle key is piped via `SPARKLE_ED_KEY`).
+- **Pages / landing site** (`.github/workflows/pages.yml`) — deploys the static landing page
+  to GitHub Pages (`https://hasanjafri.github.io/Mimer/`) on push to `main` touching
+  `site/**` or `docs/media/**`. The site is `site/` (index.html + `llms.txt`/`robots.txt`/
+  `sitemap.xml`) **assembled with `docs/media/` copied in at deploy time** (assets aren't
+  duplicated in git). This is the SEO/discoverability surface — keep its keywords, OG tags,
+  and JSON-LD honest and in sync with the README. The repo's **description, topics, and
+  homepage URL** are GitHub settings (set via `gh repo edit`), not in-repo. The repo's social-
+  preview image must be uploaded manually (Settings → General → Social preview; no API) — use
+  `docs/media/og.png`.
 
 App icon is regenerable: `swift scripts/make_icon.swift /tmp/icon.png` (indigo→violet
-squircle + white clipboard), then re-size into `Assets.xcassets/AppIcon.appiconset`.
+squircle + white clipboard), then re-size into `Assets.xcassets/AppIcon.appiconset`. The
+social card is `swift scripts/make_og.swift docs/media/og.png` (1280×640 @2×, same brand).
 
 ## Conventions
 
