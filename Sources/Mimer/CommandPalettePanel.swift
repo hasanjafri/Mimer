@@ -108,9 +108,12 @@ final class PaletteController: NSObject {
         guard Paster.canPostEvents else { isDismissing = false; return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) { [weak self] in
             guard let self else { return }
-            if let target, target.isTerminated ||
-                NSWorkspace.shared.frontmostApplication?.processIdentifier != target.processIdentifier {
-                self.isDismissing = false   // focus moved → don't paste into the wrong app
+            // Fail closed: only paste when we have a known target that is still alive and
+            // frontmost. No target (nil) or focus moved → leave the clip on the clipboard
+            // rather than firing ⌘V blindly into whatever is up front.
+            guard let target, !target.isTerminated,
+                  NSWorkspace.shared.frontmostApplication?.processIdentifier == target.processIdentifier else {
+                self.isDismissing = false
                 return
             }
             Paster.synthesizePaste()
@@ -157,10 +160,10 @@ final class PaletteController: NSObject {
         _ = Paster.copyToPasteboard(items[index])
         DispatchQueue.main.asyncAfter(deadline: .now() + initialDelay) { [weak self] in
             guard let self else { return }
-            // Abort if the intended app went away or is no longer frontmost — never paste the
-            // rest of the stack into whatever happens to be up front now.
-            if let target, target.isTerminated ||
-                NSWorkspace.shared.frontmostApplication?.processIdentifier != target.processIdentifier {
+            // Abort if the intended app is unknown, went away, or is no longer frontmost —
+            // never paste the rest of the stack into whatever happens to be up front now.
+            guard let target, !target.isTerminated,
+                  NSWorkspace.shared.frontmostApplication?.processIdentifier == target.processIdentifier else {
                 self.isDismissing = false
                 return
             }
