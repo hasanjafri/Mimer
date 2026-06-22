@@ -18,6 +18,7 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Changed
 - Concurrency groundwork toward Swift 6 (`strict-concurrency=complete`, clean).
 - Async, bounded image-thumbnail loading (off-main downsample).
+- Accessibility: VoiceOver labels on icon-only buttons (favorite, remove-exclusion, menu-bar status) and Dynamic Type scaling for the onboarding/about/menu-action glyphs.
 
 ### Fixed
 - **Security:** auto-paste now re-verifies the target app is still frontmost before posting ⌘V, so a clip can't land in an app that stole focus.

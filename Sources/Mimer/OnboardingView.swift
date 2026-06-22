@@ -7,11 +7,12 @@ struct OnboardingView: View {
     let onDone: () -> Void
 
     @State private var canPaste = Paster.canPostEvents
+    @ScaledMetric(relativeTo: .largeTitle) private var glyphSize: CGFloat = 44
 
     var body: some View {
         VStack(spacing: 18) {
             Image(systemName: "doc.on.clipboard.fill")
-                .font(.system(size: 44))
+                .font(.system(size: glyphSize))
                 .foregroundStyle(.tint)
             Text("Mimer remembers your clipboard")
                 .font(.title2.bold())
