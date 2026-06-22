@@ -3,11 +3,11 @@ import Foundation
 /// A named text transform offered via the palette's ⌘K actions. `apply` returns
 /// nil when the transform doesn't apply to the input (JSON pretty-print on
 /// non-JSON, base64 decode on non-base64, …) so the UI can hide it.
-struct ClipTransform: Identifiable {
+struct ClipTransform: Identifiable, Sendable {
     let id: String
     let name: String
     let systemImage: String
-    let apply: (String) -> String?
+    let apply: @Sendable (String) -> String?
 
     /// Transforms that produce a different, non-empty result for `text`.
     static func applicable(to text: String) -> [ClipTransform] {

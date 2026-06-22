@@ -26,7 +26,7 @@ final class DebugBridge {
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         try? "".write(to: cmdURL, atomically: true, encoding: .utf8)
         timer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: true) { [weak self] _ in
-            self?.tick()
+            MainActor.assumeIsolated { self?.tick() }   // scheduled on the main runloop
         }
         NSLog("Mimer DebugBridge active — cmd: \(cmdURL.path)")
     }

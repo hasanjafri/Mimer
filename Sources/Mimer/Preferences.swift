@@ -1,7 +1,9 @@
 import Foundation
 import Combine
 
-/// User settings, persisted in UserDefaults.
+/// User settings, persisted in UserDefaults. Main-actor-isolated: it's UI state, read/written
+/// only from the main thread (SwiftUI views, the @MainActor ClipStore, the menu bar).
+@MainActor
 final class Preferences: ObservableObject {
     static let shared = Preferences()
 

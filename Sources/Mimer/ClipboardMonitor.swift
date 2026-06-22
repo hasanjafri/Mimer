@@ -4,6 +4,7 @@ import AppKit
 /// Storage, dedupe, and capping live in ClipStore; this only detects changes and
 /// filters out password/transient/empty copies. The pasteboard is injectable so
 /// the filter logic is unit-testable without the user's real clipboard.
+@MainActor
 final class ClipboardMonitor {
     private let pasteboard: NSPasteboard
     private let shouldCapture: () -> Bool
@@ -34,7 +35,8 @@ final class ClipboardMonitor {
         // Run in .common modes so polling keeps firing during tracking loops
         // (menu open, dragging the palette) instead of stalling in .default.
         let timer = Timer(timeInterval: 0.5, repeats: true) { [weak self] _ in
-            self?.captureIfChanged()
+            // The timer is added to RunLoop.main, so it always fires on the main thread.
+            MainActor.assumeIsolated { _ = self?.captureIfChanged() }
         }
         RunLoop.main.add(timer, forMode: .common)
         self.timer = timer
