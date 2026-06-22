@@ -79,17 +79,7 @@ final class PaletteController: NSObject {
         guard let text else { isDismissing = false; return }
 
         Paster.copyToPasteboard(text)
-        // Re-focus the app we came from (unless it's gone), then paste into it.
-        if previousApp?.isTerminated == false { previousApp?.activate() }
-
-        // Only auto-paste if already permitted; otherwise the clip is on the
-        // clipboard (the user presses ⌘V). Never prompt for the grant mid-paste —
-        // the palette banner and onboarding handle enabling it, in context.
-        guard Paster.canPostEvents else { isDismissing = false; return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) { [weak self] in
-            Paster.synthesizePaste()
-            self?.isDismissing = false   // hold the reentrancy guard until the paste actually fires
-        }
+        activateThenPaste()
     }
 
     /// Dismiss and paste image bytes into the prior app (image-clip paste-back).
@@ -101,11 +91,33 @@ final class PaletteController: NSObject {
         panel = nil
 
         Paster.copyImageToPasteboard(data)
-        if previousApp?.isTerminated == false { previousApp?.activate() }
+        activateThenPaste()
+    }
+
+    /// Re-focus the app we came from, then synthesize ⌘V — but only if that exact app is still
+    /// frontmost after the focus settles. If another app stole the foreground in the window
+    /// (e.g. a malicious app racing for a just-pasted secret), abort and leave the content on
+    /// the clipboard for a manual ⌘V. Mirrors the paste-stack guard in `pasteNext`.
+    private func activateThenPaste() {
+        let target = previousApp
+        if target?.isTerminated == false { target?.activate() }
+
+        // Only auto-paste if already permitted; otherwise the clip is on the clipboard (the
+        // user presses ⌘V). Never prompt for the grant mid-paste — the palette banner and
+        // onboarding handle enabling it, in context.
         guard Paster.canPostEvents else { isDismissing = false; return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) { [weak self] in
+            guard let self else { return }
+            // Fail closed: only paste when we have a known target that is still alive and
+            // frontmost. No target (nil) or focus moved → leave the clip on the clipboard
+            // rather than firing ⌘V blindly into whatever is up front.
+            guard let target, !target.isTerminated,
+                  NSWorkspace.shared.frontmostApplication?.processIdentifier == target.processIdentifier else {
+                self.isDismissing = false
+                return
+            }
             Paster.synthesizePaste()
-            self?.isDismissing = false
+            self.isDismissing = false   // hold the reentrancy guard until the paste actually fires
         }
     }
 
@@ -148,10 +160,10 @@ final class PaletteController: NSObject {
         _ = Paster.copyToPasteboard(items[index])
         DispatchQueue.main.asyncAfter(deadline: .now() + initialDelay) { [weak self] in
             guard let self else { return }
-            // Abort if the intended app went away or is no longer frontmost — never paste the
-            // rest of the stack into whatever happens to be up front now.
-            if let target, target.isTerminated ||
-                NSWorkspace.shared.frontmostApplication?.processIdentifier != target.processIdentifier {
+            // Abort if the intended app is unknown, went away, or is no longer frontmost —
+            // never paste the rest of the stack into whatever happens to be up front now.
+            guard let target, !target.isTerminated,
+                  NSWorkspace.shared.frontmostApplication?.processIdentifier == target.processIdentifier else {
                 self.isDismissing = false
                 return
             }
