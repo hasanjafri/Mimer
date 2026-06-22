@@ -163,25 +163,32 @@ final class ClipStore: ObservableObject {
         refresh()
     }
 
-    /// Batch-delete the given rows, then delete the blob files of *exactly* those rows — but
-    /// only after the delete is confirmed, and only for blobs no surviving row still references.
+    /// Batch-delete the given rows, then delete the blob files of *exactly the rows the store
+    /// confirmed deleted* — and only for blobs no surviving row still references.
     private func batchDelete(_ ids: [NSManagedObjectID]) {
-        let blobs = blobHashes(forObjectIDs: ids)   // captured before the rows vanish
+        let hashByID = blobHashesByID(ids)   // (objectID → blobHash) captured before the rows vanish
         let batch = NSBatchDeleteRequest(objectIDs: ids)
         batch.resultType = .resultTypeObjectIDs
         guard let result = try? context.execute(batch) as? NSBatchDeleteResult,
               let deleted = result.result as? [NSManagedObjectID], !deleted.isEmpty else { return }
         NSManagedObjectContext.mergeChanges(fromRemoteContextSave: [NSDeletedObjectsKey: deleted], into: [context])
+        // Only clean blobs whose row was actually deleted (not merely requested).
+        let confirmed = Set(deleted)
+        let blobs = Set(hashByID.compactMap { confirmed.contains($0.key) ? $0.value : nil })
         for blob in blobs where !isBlobReferenced(blob) { blobStore.delete(blob) }
     }
 
-    /// The non-nil blob references of *exactly* the given rows (so blob deletion is tied to the
-    /// rows actually being removed, not a predicate/offset replay that could shift).
-    private func blobHashes(forObjectIDs ids: [NSManagedObjectID]) -> [String] {
-        guard !ids.isEmpty else { return [] }
+    /// Map of objectID → non-nil blobHash for *exactly* the given rows, so blob deletion can be
+    /// keyed to the rows the store confirms it deleted (not a predicate/offset replay that shifts).
+    private func blobHashesByID(_ ids: [NSManagedObjectID]) -> [NSManagedObjectID: String] {
+        guard !ids.isEmpty else { return [:] }
         let r = Clip.fetch()
         r.predicate = NSPredicate(format: "self IN %@", ids)
-        return ((try? context.fetch(r)) ?? []).compactMap(\.blobHash)
+        var map: [NSManagedObjectID: String] = [:]
+        for clip in (try? context.fetch(r)) ?? [] where clip.blobHash != nil {
+            map[clip.objectID] = clip.blobHash
+        }
+        return map
     }
 
     /// Save an authored snippet (kept forever, exempt from pruning). Identical
