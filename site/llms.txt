@@ -25,7 +25,7 @@ What makes it different (the developer wedge):
 
 ## Links
 
-- [Homepage](https://hasanjafri.github.io/Mimer/)
+- [Homepage](https://mimer.hasanjafri.com/)
 - [Source code](https://github.com/hasanjafri/Mimer)
 - [Latest release](https://github.com/hasanjafri/Mimer/releases/latest)
 - [Homebrew tap](https://github.com/hasanjafri/homebrew-tap)

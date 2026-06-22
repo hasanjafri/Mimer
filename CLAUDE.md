@@ -172,7 +172,8 @@ Typical loop: edit → `xcodebuild build` → relaunch the Debug app → drive v
 - Local release still works: `./scripts/release.sh <version>` (uses the keychain
   `mimer-notary` profile + Sparkle key; in CI the Sparkle key is piped via `SPARKLE_ED_KEY`).
 - **Pages / landing site** (`.github/workflows/pages.yml`) — deploys the static landing page
-  to GitHub Pages (`https://hasanjafri.github.io/Mimer/`) on push to `main` touching
+  to GitHub Pages (`https://mimer.hasanjafri.com/`, a subdomain CNAME'd to
+  `hasanjafri.github.io`; the apex `hasanjafri.com` stays a separate site + email) on push to `main` touching
   `site/**` or `docs/media/**`. The site is `site/` (index.html + `llms.txt`/`robots.txt`/
   `sitemap.xml`) **assembled with `docs/media/` copied in at deploy time** (assets aren't
   duplicated in git). This is the SEO/discoverability surface — keep its keywords, OG tags,

@@ -13,7 +13,7 @@ it's a fast command palette that understands what you copied and can transform i
 </p>
 
 > Status: **v0.2.2 — live.** Notarized, Homebrew-installable, and auto-updating via
-> Sparkle. **Website:** [hasanjafri.github.io/Mimer](https://hasanjafri.github.io/Mimer/) ·
+> Sparkle. **Website:** [mimer.hasanjafri.com](https://mimer.hasanjafri.com/) ·
 > See [CHANGELOG.md](CHANGELOG.md) for what's new and [docs/ROADMAP.md](docs/ROADMAP.md) for what's next.
 
 ---
