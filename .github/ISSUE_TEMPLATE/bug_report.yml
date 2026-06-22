@@ -1,0 +1,49 @@
+name: Bug report
+description: Something in Mimer isn't working right
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. For **security-sensitive** issues, please use
+        [private reporting](https://github.com/hasanjafri/Mimer/security/advisories/new)
+        instead (see SECURITY.md), not a public issue.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+      placeholder: I pressed ⇧⌘V and …
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Copy …
+        2. Open the palette …
+        3. …
+    validations:
+      required: true
+  - type: input
+    id: mimer-version
+    attributes:
+      label: Mimer version
+      description: Mimer ▸ menu-bar icon ▸ Settings ▸ About (or the DMG/release name).
+      placeholder: "0.2.2"
+    validations:
+      required: true
+  - type: input
+    id: macos-version
+    attributes:
+      label: macOS version
+      placeholder: "14.5 (Apple silicon / Intel)"
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Console logs (optional)
+      description: Any "Mimer" lines from Console.app around the time it happened.
+      render: text
