@@ -144,7 +144,8 @@ Typical loop: edit → `xcodebuild build` → relaunch the Debug app → drive v
   `handleKey` (a single `.onKeyPress(phases:.down)`) so ⏎/⇧⏎/⇥ never collide.
 - `MenuBarView` / `MenuBarLabel` — dropdown + the capture pulse (icon bounce + checkmark)
   and paused dimming.
-- `Onboarding*`, `Settings*` (General / Privacy / Developer / About), `SnippetComposer*`,
+- `Onboarding*`, `Settings*` (General / Privacy / Developer / About — General has a
+  `KeyboardShortcuts.Recorder` to rebind the ⇧⌘V palette hotkey), `SnippetComposer*`,
   `Preferences`, `LaunchAtLogin` (SMAppService), `UpdaterController` (Sparkle),
   `ClipKindUI` (KindIcon + `Color(hexString:)`).
 
