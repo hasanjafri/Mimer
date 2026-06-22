@@ -125,7 +125,9 @@ struct MenuBarView: View {
         let isHovered = hoverID == item.id
         let masked = SecretDetector.maskedPreview(item.text)   // nil unless it's a secret
         return HStack(spacing: 10) {
-            if masked != nil {
+            if item.kind == .image {
+                ClipThumbnail(hash: item.blobHash, size: 22)
+            } else if masked != nil {
                 Image(systemName: "lock.fill").foregroundStyle(.orange).frame(width: 16)
             } else {
                 KindIcon(kind: item.kind, text: item.text).frame(width: 16)
@@ -172,7 +174,13 @@ struct MenuBarView: View {
     /// Only confirm if the write landed, and tag each click with a generation so
     /// a re-copy's timer can't clear a later click's badge early.
     private func copy(_ item: ClipItem) {
-        guard Paster.copyToPasteboard(item.text) else { return }
+        let landed: Bool
+        if item.kind == .image, let hash = item.blobHash, let data = store.blobData(hash) {
+            landed = Paster.copyImageToPasteboard(data)
+        } else {
+            landed = Paster.copyToPasteboard(item.text)
+        }
+        guard landed else { return }
         copyGeneration &+= 1
         let generation = copyGeneration
         withAnimation(.easeOut(duration: 0.15)) { copiedID = item.id }

@@ -92,11 +92,33 @@ final class PaletteController: NSObject {
         }
     }
 
+    /// Dismiss and paste image bytes into the prior app (image-clip paste-back).
+    func dismiss(pasteImage data: Data) {
+        guard !isDismissing else { return }
+        isDismissing = true
+        panel?.delegate = nil
+        panel?.orderOut(nil)
+        panel = nil
+
+        Paster.copyImageToPasteboard(data)
+        if previousApp?.isTerminated == false { previousApp?.activate() }
+        guard Paster.canPostEvents else { isDismissing = false; return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) { [weak self] in
+            Paster.synthesizePaste()
+            self?.isDismissing = false
+        }
+    }
+
     /// Paste the clip at `index` of the current history (used by the debug bridge).
     func pasteClip(at index: Int) {
         let items = ClipStore.shared.items
         guard items.indices.contains(index) else { return }
-        dismiss(paste: items[index].text)
+        let item = items[index]
+        if item.kind == .image, let hash = item.blobHash, let data = ClipStore.shared.blobData(hash) {
+            dismiss(pasteImage: data)
+        } else {
+            dismiss(paste: item.text)
+        }
     }
 
     /// Paste several clips in order into the prior app (the paste-stack). Each clip is placed
@@ -153,6 +175,7 @@ final class PaletteController: NSObject {
         panel.delegate = self
         let root = PaletteView(
             onPaste: { [weak self] text in self?.dismiss(paste: text) },
+            onPasteImage: { [weak self] data in self?.dismiss(pasteImage: data) },
             onPasteSequence: { [weak self] texts in self?.dismiss(pasteSequence: texts) },
             onClose: { [weak self] in self?.dismiss(paste: nil) },
             initialTransformIndex: transformIndex,

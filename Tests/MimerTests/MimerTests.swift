@@ -13,6 +13,40 @@ final class ClipboardMonitorTests: XCTestCase {
         return (monitor, pb, { captured })
     }
 
+    /// A tiny valid PNG (1×1) for image-capture tests.
+    private func pngData() -> Data {
+        let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 1, pixelsHigh: 1,
+                                   bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                                   colorSpaceName: .deviceRGB, bytesPerRow: 4, bitsPerPixel: 32)!
+        return rep.representation(using: .png, properties: [:])!
+    }
+
+    func testCapturesImageWhenNoText() {
+        let pb = NSPasteboard(name: NSPasteboard.Name("MimerTestImg-\(UUID().uuidString)"))
+        pb.clearContents()
+        var texts: [String] = []; var images: [Data] = []
+        let m = ClipboardMonitor(pasteboard: pb, onCapture: { texts.append($0) }, onCaptureImage: { images.append($0) })
+        let png = pngData()
+        pb.clearContents(); pb.setData(png, forType: .png)
+        XCTAssertTrue(m.captureIfChanged())
+        XCTAssertEqual(images.count, 1)          // image forwarded
+        XCTAssertTrue(texts.isEmpty)
+    }
+
+    func testPrefersTextOverImage() {
+        let pb = NSPasteboard(name: NSPasteboard.Name("MimerTestImg-\(UUID().uuidString)"))
+        pb.clearContents()
+        var texts: [String] = []; var images: [Data] = []
+        let m = ClipboardMonitor(pasteboard: pb, onCapture: { texts.append($0) }, onCaptureImage: { images.append($0) })
+        pb.clearContents()
+        pb.declareTypes([.string, .png], owner: nil)
+        pb.setString("caption", forType: .string)
+        pb.setData(pngData(), forType: .png)
+        XCTAssertTrue(m.captureIfChanged())
+        XCTAssertEqual(texts, ["caption"])       // text wins when both present
+        XCTAssertTrue(images.isEmpty)
+    }
+
     func testForwardsCapturedText() {
         let (m, pb, captured) = makeMonitor()
         pb.clearContents(); pb.setString("alpha", forType: .string)
