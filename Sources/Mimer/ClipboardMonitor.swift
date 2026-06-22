@@ -9,6 +9,7 @@ final class ClipboardMonitor {
     private let pasteboard: NSPasteboard
     private let shouldCapture: () -> Bool
     private let onCapture: (String) -> Void
+    private let onCaptureImage: (Data) -> Void
     private var timer: Timer?
     private var lastChangeCount: Int
 
@@ -22,10 +23,12 @@ final class ClipboardMonitor {
 
     init(pasteboard: NSPasteboard = .general,
          shouldCapture: @escaping () -> Bool = { true },
-         onCapture: @escaping (String) -> Void) {
+         onCapture: @escaping (String) -> Void,
+         onCaptureImage: @escaping (Data) -> Void = { _ in }) {
         self.pasteboard = pasteboard
         self.shouldCapture = shouldCapture
         self.onCapture = onCapture
+        self.onCaptureImage = onCaptureImage
         self.lastChangeCount = pasteboard.changeCount
     }
 
@@ -54,15 +57,30 @@ final class ClipboardMonitor {
         // re-capture a stable snapshot (leave lastChangeCount untouched so we retry).
         let types = Set((pasteboard.types ?? []).map(\.rawValue))
         let text = pasteboard.string(forType: .string)
+        let png = (text?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true) ? imagePNG() : nil
         guard pasteboard.changeCount == changeCount else { return false }
 
         lastChangeCount = changeCount
 
         guard shouldCapture() else { return false }   // pause / excluded app / password manager
         guard types.isDisjoint(with: ignoredTypes) else { return false }
-        guard let text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
 
-        onCapture(text)
-        return true
+        // Prefer text (more useful/searchable); fall back to an image copy when there's no text.
+        if let text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            onCapture(text)
+            return true
+        }
+        if let png {
+            onCaptureImage(png)
+            return true
+        }
+        return false
+    }
+
+    /// Normalize a pasteboard image to PNG bytes (so all image blobs share one compact format).
+    private func imagePNG() -> Data? {
+        if let png = pasteboard.data(forType: .png) { return png }
+        guard let tiff = pasteboard.data(forType: .tiff), let rep = NSBitmapImageRep(data: tiff) else { return nil }
+        return rep.representation(using: .png, properties: [:])
     }
 }

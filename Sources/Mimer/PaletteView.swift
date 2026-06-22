@@ -146,7 +146,9 @@ struct PaletteView: View {
         let revealed = revealedSecrets.contains(item.id)
         let showMasked = masked != nil && prefs.maskSecrets && !revealed
         return HStack(spacing: 8) {
-            if masked != nil {
+            if item.kind == .image {
+                ClipThumbnail(hash: item.blobHash, size: 22)
+            } else if masked != nil {
                 Image(systemName: revealed ? "lock.open.fill" : "lock.fill")
                     .foregroundStyle(.orange).frame(width: 15)
             } else {

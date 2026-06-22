@@ -23,15 +23,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Agent app (LSUIElement): no Dock icon, menu-bar presence only.
         ClipStore.shared.loadInitial()
+        // The frontmost app at capture time is (best-effort) where the clip came from.
+        // Don't attribute to Mimer itself (ambiguous) → store nil.
+        func sourceApp() -> String? {
+            let app = NSWorkspace.shared.frontmostApplication
+            return app?.bundleIdentifier == Bundle.main.bundleIdentifier ? nil : app?.localizedName
+        }
         let monitor = ClipboardMonitor(
             shouldCapture: { CaptureGate.captureAllowed() },
-            onCapture: { text in
-                // The frontmost app at capture time is (best-effort) where the clip came from.
-                // Don't attribute to Mimer itself (ambiguous) → store nil.
-                let app = NSWorkspace.shared.frontmostApplication
-                let source = app?.bundleIdentifier == Bundle.main.bundleIdentifier ? nil : app?.localizedName
-                ClipStore.shared.insert(text: text, sourceApp: source)
-            }
+            onCapture: { text in ClipStore.shared.insert(text: text, sourceApp: sourceApp()) },
+            onCaptureImage: { data in ClipStore.shared.insertImage(data: data, sourceApp: sourceApp()) }
         )
         monitor.start()
         self.monitor = monitor

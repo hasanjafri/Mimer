@@ -74,9 +74,10 @@ images; concurrency machinery sits just before the image/OCR work that needs it.
    with `ClipItem` as the only actor-crossing type — then the Swift 6 language-mode flip.
 6. **Image clips** — *storage layer shipped (7a):* `BlobStore` (encrypted, content-addressed
    by keyed HMAC, dedupe), `Clip.blobHash` + kind `.image`, `ClipStore.insertImage(data:)`,
-   and **blob cleanup in prune/delete/clearHistory**. Next: **7b** capture from the pasteboard
-   + `CGImageSource` thumbnails in the rows (main-thread snapshot → off-main hash/thumbnail),
-   **7c** paste-back. (Orphan sweep + lazy full-image as follow-ups.)
+   and **blob cleanup in prune/delete/clearHistory**. *7b shipped:* capture an image from the
+   pasteboard (png/tiff → PNG, text preferred) + `ImageIO` thumbnails in the rows
+   (`ClipThumbnail`/`ThumbnailCache`). Next: **7c** paste-back. (Off-main thumbnailing, orphan
+   sweep, and lazy full-image preview as follow-ups.)
 7. **File clips** (security-scoped bookmarks).
 8. **Type filters + metadata detail view.**
 9. **OCR** (optional/late) — async/off-main, downsample-before-Vision, tri-state, cancel-on-delete.

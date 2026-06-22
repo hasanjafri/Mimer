@@ -62,6 +62,10 @@ Typical loop: edit → `xcodebuild build` → relaunch the Debug app → drive v
 - `ClipboardMonitor` — NSPasteboard changeCount polling (0.5s, **`.common`** runloop so it
   doesn't stall during tracking loops); ignores transient/concealed/auto-generated/
   RestoredType; torn-read re-check guard. Runs on the main thread (timer on RunLoop.main).
+  Captures **text** (preferred) or, when there's no text, an **image** (`onCaptureImage`,
+  png/tiff → normalized PNG → `ClipStore.insertImage`).
+- `ClipThumbnail` / `ThumbnailCache` — image-clip rows show a rounded thumbnail; the cache
+  decrypts the blob (`ClipStore.blobData`) and downsamples once via ImageIO, keyed by blob hash.
 - `Paster` — `copyToPasteboard` stamps `org.nspasteboard.RestoredType` so the monitor
   skips our own paste-backs; `synthesizePaste` posts ⌘V via CGEvent
   (`kTCCServicePostEvent`, `.privateState` source — not Accessibility, not AppleScript).
@@ -187,5 +191,5 @@ capture), **paste-stack** (`PasteStack` — ⇥ queue, ⇧⏎ paste in order), *
 (JSON→TS, line ops, case), and **configurable act-on integrations** (Settings → Developer:
 open commit/issue/editor), and **concurrency groundwork** (strict-concurrency=complete clean,
 `@MainActor`/`Sendable` annotations), and **image-clip storage** (`BlobStore` — encrypted,
-content-addressed; `Clip.blobHash` + `insertImage`). Next in flight: image capture + thumbnails
-(7b), then paste-back (7c).
+content-addressed; `Clip.blobHash` + `insertImage`), and **image capture + thumbnails** (7b —
+`ClipboardMonitor.onCaptureImage`, `ClipThumbnail`). Next in flight: image paste-back (7c).

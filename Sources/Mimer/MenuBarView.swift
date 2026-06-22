@@ -125,7 +125,9 @@ struct MenuBarView: View {
         let isHovered = hoverID == item.id
         let masked = SecretDetector.maskedPreview(item.text)   // nil unless it's a secret
         return HStack(spacing: 10) {
-            if masked != nil {
+            if item.kind == .image {
+                ClipThumbnail(hash: item.blobHash, size: 22)
+            } else if masked != nil {
                 Image(systemName: "lock.fill").foregroundStyle(.orange).frame(width: 16)
             } else {
                 KindIcon(kind: item.kind, text: item.text).frame(width: 16)
