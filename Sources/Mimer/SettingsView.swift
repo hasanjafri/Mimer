@@ -137,6 +137,7 @@ private struct PrivacySettingsView: View {
                             }
                             .buttonStyle(.plain)
                             .help("Stop excluding this app")
+                            .accessibilityLabel("Stop excluding \(Self.appName(for: bid))")
                         }
                     }
                 }
@@ -185,6 +186,7 @@ private struct PrivacySettingsView: View {
 }
 
 private struct AboutSettingsView: View {
+    @ScaledMetric(relativeTo: .largeTitle) private var glyphSize: CGFloat = 48
     private var version: String {
         let info = Bundle.main.infoDictionary
         let v = info?["CFBundleShortVersionString"] as? String ?? "—"
@@ -196,7 +198,7 @@ private struct AboutSettingsView: View {
         VStack(spacing: 10) {
             Spacer()
             Image(systemName: "doc.on.clipboard.fill")
-                .font(.system(size: 48))
+                .font(.system(size: glyphSize))
                 .foregroundStyle(.tint)
             Text("Mimer").font(.title.bold())
             Text("Version \(version)").font(.callout).foregroundStyle(.secondary)

@@ -152,6 +152,7 @@ struct MenuBarView: View {
             .buttonStyle(.plain)
             .foregroundStyle(item.isFavorite ? AnyShapeStyle(Color.yellow) : AnyShapeStyle(.tertiary))
             .help(item.isFavorite ? "Unfavorite" : "Favorite (kept forever)")
+            .accessibilityLabel(item.isFavorite ? "Unfavorite" : "Favorite (kept forever)")
         }
         .padding(.horizontal, 12)
         .frame(height: rowHeight)   // uniform row height so the menu's listHeight math is exact (image rows no longer clip)
@@ -231,12 +232,13 @@ private struct MenuActionRow: View {
     let action: () -> Void
 
     @State private var hovering = false
+    @ScaledMetric(relativeTo: .body) private var iconSize: CGFloat = 12
 
     var body: some View {
         Button(action: action) {
             HStack(spacing: 10) {
                 Image(systemName: systemImage)
-                    .font(.system(size: 12))
+                    .font(.system(size: iconSize))
                     .frame(width: 16)
                     .foregroundStyle(.secondary)
                 Text(title)
@@ -270,6 +272,7 @@ struct MenuBarLabel: View {
         Image(systemName: justCaptured ? "checkmark.circle.fill" : "doc.on.clipboard")
             .symbolEffect(.bounce, value: store.captureTick)
             .opacity(prefs.isPaused ? 0.4 : 1)
+            .accessibilityLabel(prefs.isPaused ? "Mimer — paused" : "Mimer — recording clipboard")
             .onChange(of: store.captureTick) {
                 justCaptured = true
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) { justCaptured = false }
