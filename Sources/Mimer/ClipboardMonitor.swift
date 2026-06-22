@@ -52,35 +52,47 @@ final class ClipboardMonitor {
         let changeCount = pasteboard.changeCount
         guard changeCount != lastChangeCount else { return false }
 
-        // Read representations, then re-check changeCount: if it advanced mid-read,
-        // the pasteboard was rewritten under us — discard and let the next tick
-        // re-capture a stable snapshot (leave lastChangeCount untouched so we retry).
+        // Read the cheap text representation, then re-check changeCount: if it advanced mid-read,
+        // the pasteboard was rewritten under us — discard and let the next tick re-capture.
         let types = Set((pasteboard.types ?? []).map(\.rawValue))
         let text = pasteboard.string(forType: .string)
-        let png = (text?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true) ? imagePNG() : nil
         guard pasteboard.changeCount == changeCount else { return false }
 
         lastChangeCount = changeCount
 
-        guard shouldCapture() else { return false }   // pause / excluded app / password manager
+        // Apply the capture gate BEFORE materializing any (potentially large/sensitive) image
+        // bytes — never read a password-manager / excluded-app / self-paste image into memory.
+        guard shouldCapture() else { return false }
         guard types.isDisjoint(with: ignoredTypes) else { return false }
 
-        // Prefer text (more useful/searchable); fall back to an image copy when there's no text.
-        if let text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            onCapture(text)
+        let trimmed = text?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let hasImage = types.contains(NSPasteboard.PasteboardType.png.rawValue)
+            || types.contains(NSPasteboard.PasteboardType.tiff.rawValue)
+
+        // Prefer text — unless it's just a single-line URL accompanying an image (e.g. "copy
+        // image" in a browser), where the image is what the user wants.
+        if let trimmed, !trimmed.isEmpty, !(hasImage && !trimmed.contains("\n") && ClipKind.detect(from: trimmed) == .link) {
+            onCapture(text!)
             return true
         }
-        if let png {
-            onCaptureImage(png)
-            return true
-        }
-        return false
+        guard hasImage, let image = imageBytes() else { return false }
+        guard pasteboard.changeCount == changeCount else { return false }   // torn-read guard for the image read
+        onCaptureImage(image)
+        return true
     }
 
-    /// Normalize a pasteboard image to PNG bytes (so all image blobs share one compact format).
-    private func imagePNG() -> Data? {
-        if let png = pasteboard.data(forType: .png) { return png }
-        guard let tiff = pasteboard.data(forType: .tiff), let rep = NSBitmapImageRep(data: tiff) else { return nil }
-        return rep.representation(using: .png, properties: [:])
+    private static let maxImageBytes = 32 * 1024 * 1024   // skip absurdly large images (would block the poll)
+
+    /// Image bytes for the blob: prefer PNG; convert TIFF → PNG; if conversion fails, keep the
+    /// raw TIFF (don't silently drop). nil if absent or over the size cap.
+    private func imageBytes() -> Data? {
+        if let png = pasteboard.data(forType: .png) {
+            return png.count <= Self.maxImageBytes ? png : nil
+        }
+        guard let tiff = pasteboard.data(forType: .tiff), tiff.count <= Self.maxImageBytes else { return nil }
+        if let rep = NSBitmapImageRep(data: tiff), let png = rep.representation(using: .png, properties: [:]) {
+            return png
+        }
+        return tiff   // unconvertible TIFF → store as-is (paste-back sniffs the type)
     }
 }

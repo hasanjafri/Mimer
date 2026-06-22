@@ -25,6 +25,19 @@ enum Paster {
         return pb.setString(text, forType: .string)
     }
 
+    /// Put image bytes back on the pasteboard (image-clip paste-back). Detects PNG vs TIFF from
+    /// the magic bytes and writes the matching type; stamps RestoredType so the monitor skips it.
+    @discardableResult
+    static func copyImageToPasteboard(_ data: Data) -> Bool {
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        let restored = NSPasteboard.PasteboardType("org.nspasteboard.RestoredType")
+        let isPNG = data.starts(with: [0x89, 0x50, 0x4E, 0x47])   // \x89PNG
+        let type: NSPasteboard.PasteboardType = isPNG ? .png : .tiff
+        pb.declareTypes([type, restored], owner: nil)
+        return pb.setData(data, forType: type)
+    }
+
     /// Synthesize ⌘V into whatever app is frontmost. Returns false if we lack
     /// PostEvent permission (caller should fall back to "it's on the clipboard").
     @discardableResult

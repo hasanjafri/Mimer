@@ -174,7 +174,13 @@ struct MenuBarView: View {
     /// Only confirm if the write landed, and tag each click with a generation so
     /// a re-copy's timer can't clear a later click's badge early.
     private func copy(_ item: ClipItem) {
-        guard Paster.copyToPasteboard(item.text) else { return }
+        let landed: Bool
+        if item.kind == .image, let hash = item.blobHash, let data = store.blobData(hash) {
+            landed = Paster.copyImageToPasteboard(data)
+        } else {
+            landed = Paster.copyToPasteboard(item.text)
+        }
+        guard landed else { return }
         copyGeneration &+= 1
         let generation = copyGeneration
         withAnimation(.easeOut(duration: 0.15)) { copiedID = item.id }

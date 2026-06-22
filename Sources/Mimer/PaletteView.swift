@@ -11,6 +11,7 @@ import SwiftUI
 /// so keyboard focus never drops.
 struct PaletteView: View {
     let onPaste: (String) -> Void
+    var onPasteImage: (Data) -> Void = { _ in }
     var onPasteSequence: ([String]) -> Void = { _ in }
     let onClose: () -> Void
     var initialTransformIndex: Int? = nil   // debug hook: open straight into transform mode
@@ -399,12 +400,22 @@ struct PaletteView: View {
 
     private func pasteSelected() {
         guard results.indices.contains(selection) else { return }
-        onPaste(results[selection].text)
+        paste(results[selection])
     }
 
     private func pasteVisible(at index: Int) {
         guard results.indices.contains(index) else { return }
-        onPaste(results[index].text)
+        paste(results[index])
+    }
+
+    /// Paste a clip: image clips put their decrypted bytes on the pasteboard; everything else
+    /// pastes its text.
+    private func paste(_ item: ClipItem) {
+        if item.kind == .image, let hash = item.blobHash, let data = store.blobData(hash) {
+            onPasteImage(data)
+        } else {
+            onPaste(item.text)
+        }
     }
 
     private func toggleFavoriteSelected() {
