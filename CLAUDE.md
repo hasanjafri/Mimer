@@ -21,9 +21,14 @@ xcodebuild -project Mimer.xcodeproj -scheme Mimer -configuration Debug \
   -destination 'platform=macOS,arch=arm64' CODE_SIGNING_ALLOWED=NO test   # 28 tests
 ```
 
-- Swift 6 toolchain, **Swift 5 language mode** (`SWIFT_VERSION 5.0`). Plan: add concurrency
-  *machinery* (background context + worker queue) first, flip to Swift 6 language mode later
-  — see `docs/ROADMAP.md`. CI runs on **macos-15** (Xcode 16 — 15.x can't read XcodeGen's v16 project format).
+- Swift 6 toolchain, **Swift 5 language mode** (`SWIFT_VERSION 5.0`) with
+  **`SWIFT_STRICT_CONCURRENCY = complete`** — the codebase is data-race-warning-clean (Swift 6
+  prep). Main-thread types are explicitly `@MainActor` (`ClipStore`, `Preferences`,
+  `PersistenceController`, `ClipboardMonitor`, `CaptureGate.captureAllowed`, `DebugBridge`);
+  value snapshots are `Sendable` (`ClipItem`, `ClipTransform` with `@Sendable` closures); Timer
+  callbacks hop via `MainActor.assumeIsolated`. No runtime threading change yet — the background
+  `NSManagedObjectContext` move lands with image capture (`docs/ROADMAP.md`), then the language-mode flip.
+  CI runs on **macos-15** (Xcode 16 — 15.x can't read XcodeGen's v16 project format).
 - macOS 14+, menu-bar agent (`LSUIElement`, no Dock icon), **non-sandboxed** (needs the
   clipboard, a global hotkey, frontmost-app lookups, and CGEvent posting). Hardened
   runtime + `Mimer.entitlements` (sandbox explicitly off).
@@ -173,5 +178,6 @@ issue/editor integrations via `ClipAction`), and
 **scoped/regex search** (`SearchQuery` — `type:`/`is:`/`app:`/`/regex/`, with `Clip.sourceApp`
 capture), **paste-stack** (`PasteStack` — ⇥ queue, ⇧⏎ paste in order), **more transforms**
 (JSON→TS, line ops, case), and **configurable act-on integrations** (Settings → Developer:
-open commit/issue/editor). Next in flight: concurrency machinery (Swift 6 prep), then image
+open commit/issue/editor), and **concurrency groundwork** (strict-concurrency=complete clean,
+`@MainActor`/`Sendable` annotations). Next in flight: image
 clips (with per-blob encryption).

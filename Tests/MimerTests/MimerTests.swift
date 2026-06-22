@@ -2,6 +2,7 @@ import XCTest
 import AppKit
 @testable import Mimer
 
+@MainActor
 final class ClipboardMonitorTests: XCTestCase {
     /// Isolated, uniquely-named pasteboard + a capture sink that records forwarded text.
     private func makeMonitor() -> (ClipboardMonitor, NSPasteboard, () -> [String]) {

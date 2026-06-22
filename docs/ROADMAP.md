@@ -66,9 +66,12 @@ images; concurrency machinery sits just before the image/OCR work that needs it.
    the model preserves; ciphertext syncs fine. Pulled ahead of search because #8 began
    *storing* secrets. Still owed when images land: **per-blob AES-GCM** for the image dir
    (the blob hole below) — reuse the same Keychain key.
-5. **Concurrency machinery** — background `NSManagedObjectContext` + serial worker queue;
-   `ClipItem` as the only actor-crossing type; `-strict-concurrency=complete` warnings in
-   Swift 5 mode. **Not** a big-bang Swift 6 flip. (Prereq for off-main image/OCR capture.)
+5. **Concurrency machinery** — *groundwork shipped:* `SWIFT_STRICT_CONCURRENCY=complete` is on
+   and the codebase is warning-clean — main-thread types are explicitly `@MainActor`, value
+   snapshots (`ClipItem`, `ClipTransform`) are `Sendable`, Timer callbacks hop via
+   `MainActor.assumeIsolated`. No runtime change yet. Still to do (with image capture): the
+   background `NSManagedObjectContext` + serial worker so capture/hash/thumbnail run off-main,
+   with `ClipItem` as the only actor-crossing type — then the Swift 6 language-mode flip.
 6. **Image clips** — file-backed, content-addressed `SHA256(raw bytes)`, `CGImageSource`
    thumbnails, lazy full image, **blob cleanup in prune/delete + orphan sweep**,
    main-thread atomic snapshot then off-main hash/thumbnail.

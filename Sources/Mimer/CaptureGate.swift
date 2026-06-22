@@ -26,6 +26,7 @@ enum CaptureGate {
     ]
 
     /// Evaluated at capture time (main thread, from the monitor's timer).
+    @MainActor
     static func captureAllowed() -> Bool {
         if Preferences.shared.isPaused { return false }
         let frontID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? ""

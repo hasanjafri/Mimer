@@ -1,10 +1,12 @@
-import CoreData
+@preconcurrency import CoreData
 
 /// Core Data stack with a programmatic (code-first) model — no `.xcdatamodeld`
 /// bundle, so the schema lives in diffable Swift. The model is CloudKit-valid
 /// (optional/defaulted attributes, no unique constraints, no ordered relationships)
 /// so enabling `NSPersistentCloudKitContainer` later is a container swap, not a
-/// schema migration.
+/// schema migration. Main-actor-isolated for now — all access is on the main thread
+/// (the @MainActor ClipStore owns it); the background-context move lands with image capture.
+@MainActor
 final class PersistenceController {
     static let shared = PersistenceController()
 
