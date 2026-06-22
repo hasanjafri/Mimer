@@ -199,6 +199,35 @@ final class ClipStoreTests: XCTestCase {
         XCTAssertEqual(raw, "recoverable legacy plaintext", "ephemeral session must not scrub recoverable plaintext")
     }
 
+    // An ephemeral insert must not trigger prune — that would batch-delete older *durable*
+    // (recoverable) rows to make room for a clip that won't survive a restart.
+    func testEphemeralKeyDoesNotEvictDurableRows() {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("MimerEvictTest-\(UUID().uuidString).sqlite")
+        defer {
+            for ext in ["", "-wal", "-shm"] {
+                try? FileManager.default.removeItem(at: URL(fileURLWithPath: url.path + ext))
+            }
+        }
+        // Two durable rows at the history limit.
+        let durable = makeStore(limit: 2, url: url)
+        durable.insert(text: "durable A")
+        durable.insert(text: "durable B")
+
+        // Ephemeral session on the same file inserts a third clip; prune must be skipped.
+        let ephemeral = Cryptor(key: SymmetricKey(data: Data(repeating: 9, count: 32)), durable: false)
+        let degraded = ClipStore(persistence: PersistenceController(inMemory: false, storeURL: url),
+                                 cryptor: ephemeral, blobStore: BlobStore(directory: blobDir, cryptor: ephemeral))
+        degraded.historyLimitOverride = 2
+        degraded.loadInitial()
+        degraded.insert(text: "ephemeral C")
+
+        // Raw on-disk count must be 3 — the durable rows were not evicted.
+        let check = PersistenceController(inMemory: false, storeURL: url)
+        let count = (try? check.viewContext.count(for: Clip.fetch())) ?? -1
+        XCTAssertEqual(count, 3, "ephemeral insert must not prune/evict durable rows")
+    }
+
     func testMigrationVacuumsFileStoreWithoutDataLoss() {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("MimerVacuumTest-\(UUID().uuidString).sqlite")

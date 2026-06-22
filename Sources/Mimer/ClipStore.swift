@@ -236,6 +236,10 @@ final class ClipStore: ObservableObject {
     /// IDs (no full-object faulting), then batch-deletes the overflow and merges
     /// the deletions back into the view context.
     private func prune() {
+        // Never evict under an ephemeral key: pruning would batch-delete older *durable*
+        // (still-recoverable) rows + blobs to make room for clips we can't read back. Let the
+        // history grow this session; a future durable launch prunes normally.
+        guard cryptor.isDurable else { return }
         let limit = max(0, historyLimitOverride ?? Preferences.shared.historyLimit)
 
         let idRequest = NSFetchRequest<NSManagedObjectID>(entityName: "Clip")
