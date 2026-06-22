@@ -6,6 +6,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-06-22
+
 ### Added
 - **Scoped & regex search** in the palette — `type:`, `is:favorite`, `app:"Name"`, and `/regex/`.
 - **Paste stack** — queue clips with `⇥` and paste them in order with `⇧⏎`.
@@ -47,7 +49,8 @@ First public release — a fast, private, developer-first clipboard manager for 
 - Pause, per-app exclusions, a built-in password-manager blocklist.
 - Optional auto-paste, launch at login, and auto-update (Sparkle). Local-only, no telemetry. MIT.
 
-[Unreleased]: https://github.com/hasanjafri/Mimer/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/hasanjafri/Mimer/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/hasanjafri/Mimer/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/hasanjafri/Mimer/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/hasanjafri/Mimer/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/hasanjafri/Mimer/releases/tag/v0.1.0
