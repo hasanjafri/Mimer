@@ -4,46 +4,60 @@
 
 **A fast, private, developer-first clipboard manager for macOS — free and open source.**
 
-Named after *Mímir*, the Norse guardian of memory and knowledge, Mimer lives in
-your menu bar, remembers everything you copy, and gets out of the way until you
-press **⇧⌘V**. It does what CopyClip and Maccy do — and then keeps going: it
-understands what you copied (links, code, colors) and can *transform* it on the spot.
+Named after *Mímir*, the Norse guardian of memory, Mimer lives in your menu bar,
+remembers everything you copy, and gets out of the way until you press **⇧⌘V** — then
+it's a fast command palette that understands what you copied and can transform it on the spot.
+
+<p align="center">
+  <img src="docs/media/hero.png" alt="Mimer command palette showing type-aware clipboard history" width="640">
+</p>
 
 > Status: **v0.2.1 — live.** Notarized, Homebrew-installable, and auto-updating via
-> Sparkle. Next up: leaning into the developer wedge (richer transforms, dev-aware clips,
-> encrypted-at-rest privacy) — see [docs/ROADMAP.md](docs/ROADMAP.md).
+> Sparkle. See [CHANGELOG.md](CHANGELOG.md) for what's new and [docs/ROADMAP.md](docs/ROADMAP.md) for what's next.
 
 ---
 
 ## Why Mimer
 
-Today's options each force a compromise:
+I built Mimer because I got tired of my old clipboard manager (CopyClip) — and then it
+wanted me to pay for **CopyClip 2** to keep going. A clipboard manager is something you
+live in all day; it should be fast, private, and free. So I made the one I wanted:
 
-| App | The catch |
-|-----|-----------|
-| **CopyClip 2** | "Favorites kept forever" is behind a purchase; dated, text-only UI |
-| **Maccy** (free, OSS) | Great privacy, but deliberately minimal — no transforms, no type-awareness |
-| **Paste** | Beautiful, but a *subscription* that stores history in iCloud by default |
-| **macOS built-in** | Text-only, items expire, no pins, no search, no exclusions |
+- **Type-aware** — it knows a link from code from a color from a git SHA, and shows the right glyph (with a live swatch for colors).
+- **⌘K transforms** — reshape a clip in place with a live preview: case, slugify, Base64/URL, JSON pretty-print, **JSON → TypeScript**, **decode a JWT**, **Unix ↔ ISO** time, and more.
+- **Built for developers** — scoped search (`type:`, `app:`, `/regex/`), a paste-stack, and **⌘O** to open a commit / issue / `file:line` straight in your tools.
+- **Private by default** — local-only, no telemetry, no subscription; history is **encrypted at rest** and detected secrets are masked on screen.
 
-**Mimer's bet:** Maccy's privacy and fair (free) pricing, a Raycast-grade command
-palette, and a developer toolbelt nobody else has — type-aware clips and
-one-keystroke transforms — all local-first, no subscription, MIT-licensed.
+Free and open source (MIT) — and it stays that way.
 
 ## Features
 
+**Search as you type** — fuzzy match, with scoped filters (`type:`, `app:`, `is:fav`, `/regex/`):
+
+<p align="center">
+  <img src="docs/media/search.gif" alt="Filtering the clipboard history by typing 'git'" width="620">
+</p>
+
+**⌘K transforms** — every transform shows a live preview, and only the ones that apply are listed:
+
+<p align="center">
+  <img src="docs/media/transform.png" alt="⌘K transform menu with live previews" width="620">
+</p>
+
+**Paste-stack** — queue several clips with **⇥**, then **⇧⏎** to paste them all in order:
+
+<p align="center">
+  <img src="docs/media/paste-stack.png" alt="Paste-stack with numbered queued clips" width="620">
+</p>
+
+### Everything else
+
 - **Clipboard history** — everything you copy, newest first, surviving restarts.
-- **Command palette (⇧⌘V)** — fuzzy search, ↑↓ to move, ⏎ to paste back into the app you were in.
-- **Scoped search** — filter as you type: `type:link` (or `code`/`color`/`sha`/`issue`/`file`/`snippet`), `type:secret`, `app:Safari` (where you copied it), `is:fav`, and `/regex/` — combine with text, e.g. `app:Terminal git`.
-- **Quick-paste (⌘1–⌘9)** — grab one of the top results instantly.
-- **Paste-stack** — press **⇥** to queue several clips (numbered in order), then **⇧⏎** to paste them all in sequence — great for filling forms or assembling something from parts.
+- **Clipboard history** — everything you copy, newest first, surviving restarts; quick-paste a top result with **⌘1–⌘9**.
 - **Type-aware clips** — links, code, colors, **git SHAs, issue keys (`ABC-123`), and file paths / stack-trace `file:line`** each get their own glyph; hex colors show a live swatch.
 - **Image clips** — copied images are captured with a thumbnail in the list and pasted right back; like all clips, they're **encrypted at rest** (the blob files hold only ciphertext).
 - **⌘O — act on a clip** — context-aware: reveal a masked secret, open a link in your browser, or reveal a file path / `file:line` in Finder. Set a git remote, issue tracker, or editor in **Settings → Developer** and ⌘O also opens a commit SHA's page, an issue key in your tracker, or a `file:line` in VS Code/Cursor.
-- **⌘K transforms** — for the selected clip, each with a live preview and shown only when it applies:
-  - *General:* `UPPER`/`lower`/`Title`, `camelCase`/`snake_case`, trim, slugify, Base64 encode/decode, URL encode/decode, JSON pretty-print/minify.
-  - *Lists:* sort lines, dedupe lines, reverse lines.
-  - *Developer:* **JSON → TypeScript**, **Decode JWT**, **strip tracking params** from a URL, **decode a query string**, **Unix ↔ ISO 8601** timestamps — with more coming (diff two clips, chains, paste-as-plain).
+- **More ⌘K transforms** (beyond the previews shown above) — `camelCase`/`snake_case`, sort/dedupe/reverse lines, **strip URL tracking params**, **decode a query string**, JSON pretty/minify — each shown only when it applies.
 - **Favorites** — ⌘D (or the ★) keeps a clip forever, pinned in its own section.
 - **Snippets** — author reusable text (signatures, boilerplate) that lives in the palette forever.
 - **Secret-aware** — detected API keys, tokens, and private keys are **masked** in the list (`AWS key ••••1234`, with a 🔒) so they're not on screen during a screenshare. They're still stored locally and pasted in full — unlike cloud tools, Mimer doesn't drop your secrets, it just hides them from view. Toggle in Privacy settings.
@@ -66,6 +80,12 @@ Planned: file clips, more transforms, OCR on images.
 | `⌫` | Delete the selected clip |
 | `esc` | Close (or leave transform mode) |
 
+The palette hotkey and history limits are configurable in **Settings → General**:
+
+<p align="center">
+  <img src="docs/media/settings.png" alt="Mimer settings: rebindable shortcut and history limits" width="460">
+</p>
+
 ## Privacy
 
 Mimer stores history in a local Core Data database under
@@ -85,6 +105,12 @@ post-event permission (not Accessibility).
 > it), previously-stored history becomes unreadable — that's inherent to at-rest encryption.
 
 ## Install
+
+On first launch Mimer walks you through the basics (and auto-paste is opt-in — it works fully without any permission):
+
+<p align="center">
+  <img src="docs/media/onboarding.png" alt="Mimer first-run onboarding" width="440">
+</p>
 
 **Download** (signed + notarized): grab the latest `Mimer-x.y.z.dmg` from
 [Releases](https://github.com/hasanjafri/Mimer/releases/latest), open it, and drag
