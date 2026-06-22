@@ -81,9 +81,9 @@ final class ClipStore: ObservableObject {
     /// then a row referencing them. Dedupes by the blob's keyed hash — re-copying the same image
     /// just moves the existing row to the top (no new blob, no new row).
     func insertImage(data: Data, sourceApp: String? = nil) {
-        let hash = cryptor.dedupeHash(data)
+        let hash = blobStore.hash(for: data)                 // the blob store owns the key (filename)
         let blobExistedBefore = blobStore.exists(hash)
-        guard blobStore.store(data) != nil else { return }   // fail closed — no blob, no row
+        guard blobStore.store(data) == hash else { return }  // fail closed; persist exactly what's stored
         let now = Date()
 
         let request = Clip.fetch()

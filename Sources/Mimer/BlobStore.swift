@@ -17,6 +17,10 @@ struct BlobStore: Sendable {
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
     }
 
+    /// The content key (== filename) these bytes will get. The single source of truth for the
+    /// blob hash, so callers persist exactly what `store` writes (no independent recomputation).
+    func hash(for data: Data) -> String { cryptor.dedupeHash(data) }
+
     /// A blob URL only for a well-formed hash (64 lowercase hex = HMAC-SHA256). Anything else
     /// (DB/sync tampering) → nil, so a stored value can never become a path-traversal filename.
     private func url(for hash: String) -> URL? {
