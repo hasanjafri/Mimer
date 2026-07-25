@@ -34,6 +34,13 @@ enum Feedback {
     }
 
     private static var cpuDescription: String {
+        // Under Rosetta on Apple silicon, uname reports "x86_64", which would
+        // mislabel the report as Intel — consult the translation flag first.
+        var translated: Int32 = 0
+        var size = MemoryLayout<Int32>.size
+        if sysctlbyname("sysctl.proc_translated", &translated, &size, nil, 0) == 0, translated == 1 {
+            return "Apple silicon"
+        }
         var info = utsname()
         uname(&info)
         let machine = withUnsafeBytes(of: &info.machine) { raw in
