@@ -208,6 +208,8 @@ private struct AboutSettingsView: View {
                 .multilineTextAlignment(.center)
             HStack(spacing: 18) {
                 Link("GitHub", destination: URL(string: "https://github.com/hasanjafri/Mimer")!)
+                Link("Send Feedback", destination: Feedback.bugReportURL)
+                Link("Discussions", destination: Feedback.discussionsURL)
                 Link("License", destination: URL(string: "https://github.com/hasanjafri/Mimer/blob/main/LICENSE")!)
             }
             .padding(.top, 4)
