@@ -147,7 +147,11 @@ Typical loop: edit → `xcodebuild build` → relaunch the Debug app → drive v
   `dismiss(pasteSequence:)` (each clip pasted with a gap). All key handling routes through
   `handleKey` (a single `.onKeyPress(phases:.down)`) so ⏎/⇧⏎/⇥ never collide.
 - `MenuBarView` / `MenuBarLabel` — dropdown + the capture pulse (icon bounce + checkmark)
-  and paused dimming.
+  and paused dimming. Footer has a **Send Feedback…** item (opens the prefilled bug form).
+- `Feedback` — builds the "Send Feedback" destinations (no telemetry, so a prefilled GitHub
+  issue is the feedback channel). `bugReportURL` deep-links `bug_report.yml` with the Mimer
+  version + macOS version/arch prefilled into the form's field IDs (kept in sync by
+  `FeedbackTests`); `discussionsURL` for ideas. Wired into the menu footer + Settings → About.
 - `Onboarding*`, `Settings*` (General / Privacy / Developer / About — General has a
   `KeyboardShortcuts.Recorder` to rebind the ⇧⌘V palette hotkey), `SnippetComposer*`,
   `Preferences`, `LaunchAtLogin` (SMAppService), `UpdaterController` (Sparkle),

@@ -145,6 +145,14 @@ global hotkey. The Xcode project is generated from `project.yml` via
 [XcodeGen](https://github.com/yonaskolb/XcodeGen) (so the `.xcodeproj` is not
 committed). See [`docs/`](docs/) for the research, design, plan, and reviews.
 
+## Feedback
+
+Mimer collects **no telemetry** — the only way your experience reaches me is if you
+tell me. There's a **Send Feedback…** item in the menu-bar dropdown (and in
+Settings → About) that opens a pre-filled bug report; ideas and questions go to
+[Discussions](https://github.com/hasanjafri/Mimer/discussions). Whatever's rough,
+missing, or delightful — I'd love to hear it.
+
 ## Contributing
 
 Issues and PRs welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for build/test (run

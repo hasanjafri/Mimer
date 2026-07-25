@@ -210,6 +210,9 @@ struct MenuBarView: View {
             MenuActionRow(title: "Settings…", systemImage: "gearshape") {
                 SettingsWindowController.shared.show()
             }
+            MenuActionRow(title: "Send Feedback…", systemImage: "exclamationmark.bubble") {
+                NSWorkspace.shared.open(Feedback.bugReportURL)
+            }
 
             Divider().padding(.horizontal, 4).padding(.vertical, 3)
 
