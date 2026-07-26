@@ -38,6 +38,19 @@ targets:
     dependencies:
       - package: KeyboardShortcuts
       - package: Sparkle
+      # Bundle the CLI + MCP binaries into the app (Contents/Resources) with Code Sign On
+      # Copy, so a notarized release ships them signed and `brew` users get them without
+      # building. NOTE: destination is Resources, NOT Executables (Contents/MacOS) — the
+      # binary `mimer` would collide with the app's own `Mimer` executable on case-insensitive
+      # APFS and clobber it. CLITools resolves them from Bundle.main.resourceURL.
+      - target: MimerCLI
+        codeSign: true
+        copy:
+          destination: resources
+      - target: MimerMCP
+        codeSign: true
+        copy:
+          destination: resources
     info:
       path: Sources/Mimer/Info.plist
       properties:
@@ -112,8 +125,8 @@ schemes:
       targets:
         Mimer: all
         MimerTests: [test]
-        MimerCLI: all
-        MimerMCP: all
+        # MimerCLI / MimerMCP build automatically as app copy-dependencies (and as
+        # MimerTests deps for the integration tests) — no explicit entry needed.
     run:
       config: Debug
     test:

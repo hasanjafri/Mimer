@@ -98,9 +98,36 @@ private struct DeveloperSettingsView: View {
             } footer: {
                 Text("⌘O on a stack-trace file:line opens it here at the line. A plain file path always reveals in Finder.")
             }
+
+            if CLITools.isAvailable {
+                Section {
+                    Button("Install Command-Line Tools…", action: installCLITools)
+                } header: {
+                    Text("Command line")
+                } footer: {
+                    Text("Symlinks **mimer** (⌘K transforms) and **mimer-mcp** (the MCP server for AI clients) into /usr/local/bin so you can run them in a terminal. If that folder isn't writable, the exact commands are copied to your clipboard instead.")
+                }
+            }
         }
         .formStyle(.grouped)
         .padding()
+    }
+
+    private func installCLITools() {
+        let alert = NSAlert()
+        switch CLITools.install() {
+        case .installed(let names):
+            alert.messageText = "Command-line tools installed"
+            alert.informativeText = "Linked \(names.joined(separator: " and ")) into /usr/local/bin. Open a new terminal and run `mimer list`."
+        case .manual(let command):
+            Paster.copyToPasteboard(command)
+            alert.messageText = "Couldn't write to /usr/local/bin"
+            alert.informativeText = "The commands to install the tools yourself have been copied to your clipboard — paste them into Terminal (add `sudo ` if it reports permission denied)."
+        case .unavailable:
+            alert.messageText = "Command-line tools aren't available"
+            alert.informativeText = "This build doesn't include the bundled binaries."
+        }
+        alert.runModal()
     }
 }
 
