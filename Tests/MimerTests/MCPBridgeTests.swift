@@ -35,12 +35,28 @@ final class MCPBridgeTests: XCTestCase {
         XCTAssertEqual(recent(many, enabled: true, limit: 10_000).count, 100)  // hard cap
     }
 
-    func testSecretsAreMaskedWhenMaskingOn() {
+    func testSecretsExcludedFromRecentWhenMaskingOn() {
         let aws = "AKIA" + "0123456789ABCDEF"
-        let masked = recent([item(aws)], enabled: true, mask: true)
-        XCTAssertEqual(masked.first?.text, "AWS key ••••CDEF")
+        // Masking on: the secret clip is kept off the AI surface entirely, not masked.
+        let masked = recent([item(aws), item("ordinary note")], enabled: true, mask: true)
+        XCTAssertEqual(masked.map(\.text), ["ordinary note"])
+        // Masking off: the user opted out of masking, so full text is exposed (UI parity).
         let unmasked = recent([item(aws)], enabled: true, mask: false)
         XCTAssertEqual(unmasked.first?.text, aws)
+    }
+
+    // Regression: search must not become an oracle. With masking on, a query that would match
+    // a secret's raw content returns nothing, so hit/no-hit can't reconstruct the secret.
+    func testSearchCannotOracleSecretsWhenMaskingOn() {
+        let aws = "AKIA" + "0123456789ABCDEF"
+        let items = [item(aws), item("public value")]
+        let hit = MCPBridge.respond(to: MCPWire.Request(op: .search, query: "/AKIA0123/", limit: 20),
+                                    items: items, maskSecrets: true, enabled: true).clips
+        XCTAssertTrue(hit.isEmpty, "secret leaked through search: \(hit.map(\.text))")
+        // type:secret must not enumerate secrets either.
+        let enumerate = MCPBridge.respond(to: MCPWire.Request(op: .search, query: "type:secret", limit: 20),
+                                          items: items, maskSecrets: true, enabled: true).clips
+        XCTAssertTrue(enumerate.isEmpty)
     }
 
     func testSearchFiltersViaSearchQuery() {

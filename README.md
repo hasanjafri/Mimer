@@ -178,9 +178,12 @@ it — read your recent and searched clips.
 **Off by default.** Reading clip history requires you to turn on
 **Settings → Privacy → “Allow local AI tools to read clips.”** While that's off, the app
 opens no port and the server can read nothing — the gate is enforced by the app, not by the
-server's good behavior. Everything stays on your Mac over a local-only channel, and masked
-secrets stay masked in what the AI sees. The **transform** tools work with no history access
-and no toggle.
+server's good behavior. Everything stays on your Mac over a local-only channel, and while
+masking is on, detected secrets are hidden from the AI entirely (kept off the surface, not
+just masked, so `search_clips` can't be used to probe them). The **transform** tools work
+with no history access and no toggle. Note: while enabled, the local channel isn't
+authenticated, so any process on your Mac can query it — it's meant to be turned on only
+while you want an assistant to have access.
 
 Tools: `list_transforms`, `transform`, `recent_clips`, `search_clips`.
 

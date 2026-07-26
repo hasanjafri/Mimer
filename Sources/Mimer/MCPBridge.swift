@@ -7,9 +7,10 @@ import Combine
 /// so an MCP client can read nothing: the default-off gate is enforced here, in the app,
 /// not by the server's good behavior.
 ///
-/// The port is local (per-user, never network-reachable). Clips are read from the
-/// already-decrypted in-memory `ClipStore` — nothing new is written to disk — and detected
-/// secrets are masked in the output when masking is on, exactly as in the UI.
+/// The port is local (per-user, never network-reachable — while enabled, any local process
+/// can query it, which is acceptable given it's opt-in and local-only). Clips are read from
+/// the already-decrypted in-memory `ClipStore` — nothing new is written to disk — and while
+/// masking is on, detected secrets are kept off this surface entirely (see `respond`).
 @MainActor
 final class MCPBridge {
     static let shared = MCPBridge()
@@ -62,21 +63,31 @@ final class MCPBridge {
 
     /// Pure core (no port, no app, no Core Data) so the gate is exhaustively testable.
     /// Returns nothing unless `enabled` — the default-off gate — and the wire version matches;
-    /// filters out image clips, honors `maskSecrets`, and caps the result at 100.
+    /// caps the result at 100. When `maskSecrets` is on, detected secrets are kept **entirely
+    /// off** this surface, not just masked: search matches against a clip's full text, so
+    /// returning secret clips at all would turn `search_clips` into an oracle that could
+    /// reconstruct a masked secret character by character. Image clips carry no text and are
+    /// always excluded.
     nonisolated static func respond(to request: MCPWire.Request, items: [ClipItem],
                                     maskSecrets: Bool, enabled: Bool) -> MCPWire.Response {
         guard enabled, request.version == MCPWire.version else { return MCPWire.Response(clips: []) }
         let limit = max(1, min(request.limit, 100))
-        let textItems = items.filter { $0.kind != .image }   // text clips only
+        let visible = items.filter { item in
+            guard item.kind != .image else { return false }
+            if maskSecrets, SecretDetector.maskedPreview(item.text) != nil { return false }
+            return true
+        }
         let selected: [ClipItem]
         switch request.op {
         case .recent:
-            selected = Array(textItems.prefix(limit))
+            selected = Array(visible.prefix(limit))
         case .search:
             let q = SearchQuery.parse(request.query ?? "")
-            selected = Array(textItems.filter { q.matches($0) }.prefix(limit))
+            selected = Array(visible.filter { q.matches($0) }.prefix(limit))
         }
         let clips = selected.map { item -> MCPWire.Clip in
+            // Belt-and-suspenders: secrets are already excluded above when masking is on;
+            // this keeps the mapping safe on its own if that ever changes.
             let text = (maskSecrets ? SecretDetector.maskedPreview(item.text) : nil) ?? item.text
             return MCPWire.Clip(text: text, kind: kindName(item.kind),
                                 createdAt: item.createdAt.timeIntervalSince1970,

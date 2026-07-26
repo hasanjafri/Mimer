@@ -173,8 +173,10 @@ Typical loop: edit → `xcodebuild build` → relaunch the Debug app → drive v
   both targets. **The opt-in gate is app-side:** `MCPBridge` (`@MainActor`) registers the port
   **only when `Preferences.mcpEnabled` is on (default off)** — Settings → Privacy toggle — so
   while off there's no port and the server reads nothing. `MCPBridge.respond(...)` is the pure,
-  exhaustively-tested gate core (honors the enable flag, filters images, masks secrets when
-  `maskSecrets` is on, caps at 100). Same `PRODUCT_MODULE_NAME` case-collision caution as MimerCLI.
+  exhaustively-tested gate core (honors the enable flag, filters images, caps at 100, and —
+  while `maskSecrets` is on — keeps detected secrets **off the surface entirely**, not just
+  masked: search matches full text, so returning secret clips would make `search_clips` an
+  oracle that reconstructs them). Same `PRODUCT_MODULE_NAME` case-collision caution as MimerCLI.
   Build-from-source for now; bundling in the notarized `.app` is a later dry-run-gated PR.
 - `Onboarding*`, `Settings*` (General / Privacy / Developer / About — General has a
   `KeyboardShortcuts.Recorder` to rebind the ⇧⌘V palette hotkey), `SnippetComposer*`,
