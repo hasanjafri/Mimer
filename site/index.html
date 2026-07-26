@@ -44,6 +44,10 @@
   "isAccessibleForFree": true,
   "author": { "@type": "Person", "name": "Hasan Jafri" },
   "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "sameAs": [
+    "https://github.com/hasanjafri/Mimer",
+    "https://alternativeto.net/software/mimer/"
+  ],
   "featureList": [
     "Type-aware clipboard history (links, code, colors, git SHAs, issue keys, file paths)",
     "⌘K transforms with live preview (case, slugify, Base64/URL, JSON pretty-print, JSON to TypeScript, decode JWT, Unix to ISO)",
@@ -69,6 +73,12 @@
   a { color: var(--indigo); text-decoration: none; }
   a:hover { text-decoration: underline; }
   .wrap { max-width: 940px; margin: 0 auto; padding: 0 24px; }
+
+  nav.top { border-bottom: 1px solid var(--line); }
+  nav.top .wrap { display: flex; align-items: center; gap: 20px; padding: 14px 24px; }
+  nav.top .brand { font-weight: 700; font-size: 18px; color: var(--ink); }
+  nav.top a.link { color: var(--muted); font-size: 15px; }
+  nav.top .spacer { flex: 1; }
 
   header.hero {
     background: linear-gradient(135deg, var(--indigo), var(--violet));
@@ -121,6 +131,16 @@
 </head>
 <body>
 
+<nav class="top">
+  <div class="wrap">
+    <a class="brand" href="/">Mimer</a>
+    <span class="spacer"></span>
+    <a class="link" href="/compare.html">Compare</a>
+    <a class="link" href="/faq.html">FAQ</a>
+    <a class="link" href="https://github.com/hasanjafri/Mimer">GitHub</a>
+  </div>
+</nav>
+
 <header class="hero">
   <div class="wrap">
     <h1>Mimer</h1>
@@ -138,7 +158,7 @@
 
 <section id="features">
   <h2>What it does</h2>
-  <p class="lede">A free alternative to Maccy and CopyClip — with the type-awareness and transforms they lack, built for developers.</p>
+  <p class="lede">A free alternative to Maccy and CopyClip — with the type-awareness and transforms they lack, built for developers. <a href="/compare.html">See how it compares&nbsp;→</a></p>
   <div class="grid">
     <div class="feature">
       <h3>Type-aware history</h3>
@@ -195,6 +215,8 @@
   <div class="wrap">
     Mimer is free and open source (<a href="https://github.com/hasanjafri/Mimer/blob/main/LICENSE">MIT</a>).
     Named after <em>Mímir</em>, the Norse guardian of memory. ·
+    <a href="/compare.html">Compare</a> ·
+    <a href="/faq.html">FAQ</a> ·
     <a href="https://github.com/hasanjafri/Mimer">GitHub</a> ·
     <a href="https://github.com/hasanjafri/Mimer/releases">Releases</a> ·
     <a href="https://github.com/hasanjafri/Mimer/blob/main/CHANGELOG.md">Changelog</a>

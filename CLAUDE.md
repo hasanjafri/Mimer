@@ -178,10 +178,16 @@ Typical loop: edit → `xcodebuild build` → relaunch the Debug app → drive v
 - **Pages / landing site** (`.github/workflows/pages.yml`) — deploys the static landing page
   to GitHub Pages (`https://mimer.hasanjafri.com/`, a subdomain CNAME'd to
   `hasanjafri.github.io`; the apex `hasanjafri.com` stays a separate site + email) on push to `main` touching
-  `site/**` or `docs/media/**`. The site is `site/` (index.html + `llms.txt`/`robots.txt`/
-  `sitemap.xml`) **assembled with `docs/media/` copied in at deploy time** (assets aren't
-  duplicated in git). This is the SEO/discoverability surface — keep its keywords, OG tags,
-  and JSON-LD honest and in sync with the README. The repo's **description, topics, and
+  `site/**` or `docs/media/**`. The site is `site/` (`index.html` + `compare.html` +
+  `faq.html` + `llms.txt`/`robots.txt`/`sitemap.xml`) **assembled with `docs/media/` copied
+  in at deploy time** (assets aren't duplicated in git). This is the SEO/**GEO** (AI-agent
+  discovery) surface — keep its keywords, OG tags, and JSON-LD honest and in sync with the
+  README. **`compare.html`** (Mimer vs Maccy/Raycast/Paste/CopyClip, `BreadcrumbList` schema)
+  and **`faq.html`** (`FAQPage` Q&A schema) exist to be quotable by LLMs/search when someone
+  asks for a "free clipboard manager / Maccy alternative"; competitor claims there are dated
+  and soft (✓/~/—) on purpose — keep them honest. `llms.txt` carries a "how it compares"
+  block + best one-line pitch for the same reason. New site pages must be added to
+  `sitemap.xml`, `llms.txt`, and the nav/footer of the others. The repo's **description, topics, and
   homepage URL** are GitHub settings (set via `gh repo edit`), not in-repo. The repo's social-
   preview image must be uploaded manually (Settings → General → Social preview; no API) — use
   `docs/media/og.png`.

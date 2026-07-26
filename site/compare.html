@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mimer vs Maccy, Raycast, Paste & CopyClip — clipboard manager comparison</title>
+<meta name="description" content="How Mimer compares to Maccy, Raycast, Paste, and CopyClip: a free, open-source macOS clipboard manager with ⌘K transforms, type-aware history, and encrypted-at-rest privacy. See which clipboard manager fits.">
+<meta name="keywords" content="Maccy alternative, Raycast clipboard alternative, Paste alternative, CopyClip alternative, free clipboard manager mac, open source clipboard manager, clipboard manager comparison">
+<meta name="author" content="Hasan Jafri">
+<meta name="theme-color" content="#4A40E6">
+<link rel="canonical" href="https://mimer.hasanjafri.com/compare.html">
+
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Mimer">
+<meta property="og:title" content="Mimer vs Maccy, Raycast, Paste & CopyClip">
+<meta property="og:description" content="A free, open-source macOS clipboard manager with ⌘K transforms, type-aware history, and encrypted-at-rest privacy — compared to Maccy, Raycast, Paste, and CopyClip.">
+<meta property="og:url" content="https://mimer.hasanjafri.com/compare.html">
+<meta property="og:image" content="https://mimer.hasanjafri.com/media/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Mimer vs Maccy, Raycast, Paste & CopyClip">
+<meta name="twitter:image" content="https://mimer.hasanjafri.com/media/og.png">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    { "@type": "ListItem", "position": 1, "name": "Mimer", "item": "https://mimer.hasanjafri.com/" },
+    { "@type": "ListItem", "position": 2, "name": "Compare", "item": "https://mimer.hasanjafri.com/compare.html" }
+  ]
+}
+</script>
+
+<style>
+  :root {
+    --indigo: #4A40E6; --violet: #8F47ED; --ink: #1c1b29; --muted: #5b5870;
+    --bg: #ffffff; --card: #f7f6fb; --line: #e8e6f2; --good: #1f9d55;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; color: var(--ink); background: var(--bg);
+    font: 17px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--indigo); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 0 24px; }
+
+  nav.top { border-bottom: 1px solid var(--line); }
+  nav.top .wrap { display: flex; align-items: center; gap: 20px; padding: 14px 24px; }
+  nav.top .brand { font-weight: 700; font-size: 18px; color: var(--ink); }
+  nav.top a.link { color: var(--muted); font-size: 15px; }
+  nav.top .spacer { flex: 1; }
+
+  header.hero {
+    background: linear-gradient(135deg, var(--indigo), var(--violet));
+    color: #fff; padding: 56px 0 48px; text-align: center;
+  }
+  header.hero h1 { font-size: 40px; margin: 0 0 10px; letter-spacing: -1px; }
+  header.hero p { font-size: 18px; opacity: .95; margin: 0 auto; max-width: 640px; }
+
+  main { padding: 12px 0 8px; }
+  section { padding: 40px 0; border-bottom: 1px solid var(--line); }
+  section h2 { font-size: 26px; letter-spacing: -.4px; margin: 0 0 10px; }
+  section p { color: var(--ink); }
+  section p.lede { color: var(--muted); font-size: 18px; margin: 0 0 20px; }
+
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; }
+  table { border-collapse: collapse; width: 100%; min-width: 640px; font-size: 15.5px; }
+  th, td { padding: 12px 14px; text-align: left; border-bottom: 1px solid var(--line); }
+  thead th { background: var(--card); font-size: 14px; letter-spacing: .01em; }
+  tbody th { font-weight: 600; }
+  td.c { text-align: center; }
+  col.mimer, th.mimer { background: rgba(74,64,230,.05); }
+  .yes { color: var(--good); font-weight: 700; }
+  .no { color: #b9b6c8; }
+  .partial { color: var(--muted); }
+  .legend { color: var(--muted); font-size: 14px; margin: 12px 2px 0; }
+
+  h3 { font-size: 18px; margin: 26px 0 4px; }
+  h3 + p { margin-top: 0; color: var(--muted); font-size: 16px; }
+
+  .cta { display: inline-flex; gap: 12px; flex-wrap: wrap; margin-top: 8px; }
+  .btn { display: inline-block; padding: 12px 22px; border-radius: 11px; font-weight: 600; font-size: 16px; }
+  .btn.primary { background: var(--indigo); color: #fff; }
+  .btn.ghost { background: var(--card); color: var(--indigo); border: 1px solid var(--line); }
+  .btn:hover { text-decoration: none; opacity: .92; }
+  .brew { display: inline-block; margin-top: 18px; background: #14131f; color: #eceaff;
+          padding: 10px 16px; border-radius: 10px; font: 15px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+  footer { padding: 40px 0 56px; color: var(--muted); font-size: 14.5px; text-align: center; }
+  footer a { color: var(--muted); text-decoration: underline; }
+  @media (max-width: 640px) {
+    header.hero h1 { font-size: 30px; }
+    section { padding: 32px 0; }
+  }
+</style>
+</head>
+<body>
+
+<nav class="top">
+  <div class="wrap">
+    <a class="brand" href="/">Mimer</a>
+    <span class="spacer"></span>
+    <a class="link" href="/">Home</a>
+    <a class="link" href="/compare.html">Compare</a>
+    <a class="link" href="/faq.html">FAQ</a>
+    <a class="link" href="https://github.com/hasanjafri/Mimer">GitHub</a>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <h1>Mimer vs Maccy, Raycast, Paste &amp; CopyClip</h1>
+    <p>Mimer is a free, open-source macOS clipboard manager built for developers — type-aware history, ⌘K transforms, and history encrypted at rest. Here is how it compares to the ones you have probably heard of.</p>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section>
+  <h2>At a glance</h2>
+  <p class="lede">The short version: Maccy is the great free baseline, Raycast bundles clipboard into a launcher, Paste is the polished paid option, and Mimer adds a developer layer — transforms, type-awareness, and encryption — while staying free and open source.</p>
+  <div class="tablewrap">
+    <table>
+      <colgroup><col><col class="mimer"><col><col><col><col></colgroup>
+      <thead>
+        <tr>
+          <th scope="col">&nbsp;</th>
+          <th scope="col" class="mimer">Mimer</th>
+          <th scope="col">Maccy</th>
+          <th scope="col">Raycast</th>
+          <th scope="col">Paste</th>
+          <th scope="col">CopyClip</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><th scope="row">Price</th><td class="c mimer">Free</td><td class="c">Free</td><td class="c">Freemium</td><td class="c">Subscription</td><td class="c">Free / paid v2</td></tr>
+        <tr><th scope="row">Open source</th><td class="c mimer"><span class="yes">✓</span></td><td class="c"><span class="yes">✓</span></td><td class="c"><span class="no">—</span></td><td class="c"><span class="no">—</span></td><td class="c"><span class="no">—</span></td></tr>
+        <tr><th scope="row">⌘K text transforms<br><small>(JSON→TS, decode JWT, Base64…)</small></th><td class="c mimer"><span class="yes">✓</span></td><td class="c"><span class="no">—</span></td><td class="c partial">~</td><td class="c"><span class="no">—</span></td><td class="c"><span class="no">—</span></td></tr>
+        <tr><th scope="row">Type-aware clips<br><small>(git SHA, issue key, color, file:line)</small></th><td class="c mimer"><span class="yes">✓</span></td><td class="c"><span class="no">—</span></td><td class="c"><span class="no">—</span></td><td class="c"><span class="no">—</span></td><td class="c"><span class="no">—</span></td></tr>
+        <tr><th scope="row">History encrypted at rest</th><td class="c mimer"><span class="yes">✓</span></td><td class="c"><span class="no">—</span></td><td class="c partial">~</td><td class="c partial">~</td><td class="c"><span class="no">—</span></td></tr>
+        <tr><th scope="row">On-screen secret masking</th><td class="c mimer"><span class="yes">✓</span></td><td class="c"><span class="no">—</span></td><td class="c"><span class="no">—</span></td><td class="c"><span class="no">—</span></td><td class="c"><span class="no">—</span></td></tr>
+        <tr><th scope="row">Local-only, no telemetry</th><td class="c mimer"><span class="yes">✓</span></td><td class="c"><span class="yes">✓</span></td><td class="c"><span class="no">—</span></td><td class="c partial">~</td><td class="c partial">~</td></tr>
+        <tr><th scope="row">Scoped search &amp; regex</th><td class="c mimer"><span class="yes">✓</span></td><td class="c partial">~</td><td class="c partial">~</td><td class="c partial">~</td><td class="c"><span class="no">—</span></td></tr>
+        <tr><th scope="row">Paste-stack (paste many in order)</th><td class="c mimer"><span class="yes">✓</span></td><td class="c"><span class="no">—</span></td><td class="c"><span class="no">—</span></td><td class="c partial">~</td><td class="c"><span class="no">—</span></td></tr>
+        <tr><th scope="row">Images in history</th><td class="c mimer"><span class="yes">✓</span></td><td class="c"><span class="yes">✓</span></td><td class="c"><span class="yes">✓</span></td><td class="c"><span class="yes">✓</span></td><td class="c"><span class="no">—</span></td></tr>
+        <tr><th scope="row">Cross-device sync</th><td class="c mimer"><span class="no">—</span></td><td class="c"><span class="no">—</span></td><td class="c partial">~</td><td class="c"><span class="yes">✓</span></td><td class="c"><span class="no">—</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="legend"><span class="yes">✓</span> yes · <span class="partial">~</span> partial or plan-dependent · <span class="no">—</span> not a focus / not offered. Mimer's rows are verifiable in the open-source code. Competitor details are our best read as of July 2026 and can change — check each product's own site, and if we have something wrong, <a href="https://github.com/hasanjafri/Mimer/issues/new?template=bug_report.yml">tell us</a>. Sync is deliberately absent from Mimer: it stays local-first for privacy.</p>
+</section>
+
+<section>
+  <h2>Which one is right for you</h2>
+
+  <h3>Coming from Maccy</h3>
+  <p>Maccy is an excellent, fast, free, open-source baseline — if all you need is history and search, it is hard to beat. Mimer is the step up when you want the clipboard to <em>understand</em> what you copied: ⌘K transforms (JSON → TypeScript, decode a JWT, slugify, Base64), type-aware clips that act on git SHAs and <code>file:line</code> refs, and history that is encrypted at rest rather than stored in the clear.</p>
+
+  <h3>Using Raycast's clipboard history</h3>
+  <p>Raycast is a launcher with a clipboard feature; it is powerful but closed-source, telemetry-enabled, and its deeper features sit behind Pro. Mimer is the opposite trade: a focused, open-source, local-only tool that does one thing — the clipboard — with developer transforms Raycast's generic history does not.</p>
+
+  <h3>Paying for Paste, Pastebot, or CopyClip 2</h3>
+  <p>Paste is beautifully polished with iCloud sync, Pastebot has paid paste filters, and CopyClip 2 is the paid sequel to CopyClip — all closed source. Mimer gives you transforms and a paste-stack for free and open source, with encryption and secret masking built in. The one thing it does not do is cross-device sync; that is a deliberate privacy choice.</p>
+
+  <h3>On Flycut or plain CopyClip</h3>
+  <p>Flycut and CopyClip are free and lightweight but text-only and minimal. Mimer keeps that lightweight, menu-bar-first feel and adds images, type-awareness, transforms, and encryption on top.</p>
+</section>
+
+<section>
+  <h2>Try Mimer</h2>
+  <p class="lede">Free and open source (MIT). macOS 14 (Sonoma) or later. Signed, notarized, and auto-updating.</p>
+  <div class="cta">
+    <a class="btn primary" href="https://github.com/hasanjafri/Mimer/releases/latest">Download for macOS</a>
+    <a class="btn ghost" href="https://github.com/hasanjafri/Mimer">View on GitHub</a>
+  </div>
+  <div><span class="brew">brew install --cask hasanjafri/tap/mimer</span></div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    Mimer is free and open source (<a href="https://github.com/hasanjafri/Mimer/blob/main/LICENSE">MIT</a>). ·
+    <a href="/">Home</a> · <a href="/compare.html">Compare</a> · <a href="/faq.html">FAQ</a> ·
+    <a href="https://github.com/hasanjafri/Mimer">GitHub</a>
+    <br>© 2026 Hasan Jafri
+  </div>
+</footer>
+
+</body>
+</html>
