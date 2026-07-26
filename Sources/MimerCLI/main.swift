@@ -14,30 +14,8 @@ import Foundation
 
 let cliVersion = "0.2.2"
 
-/// Maps friendly kebab aliases to ClipTransform ids, so an agent can call the
-/// obvious name (`json-to-ts`, `decode-jwt`) instead of the terse internal id.
-let aliases: [String: String] = [
-    "uppercase": "upper", "lowercase": "lower", "title-case": "title",
-    "trim": "trim", "slugify": "slug",
-    "base64-encode": "b64enc", "base64-decode": "b64dec",
-    "url-encode": "urlenc", "url-decode": "urldec",
-    "json-pretty": "jsonpretty", "json-minify": "jsonmin",
-    "decode-jwt": "jwt", "strip-tracking": "urlstrip", "decode-query": "urlquery",
-    "unix-to-iso": "epoch2iso", "iso-to-unix": "iso2epoch",
-    "json-to-ts": "json2ts",
-    "sort-lines": "sortlines", "dedupe-lines": "dedupelines", "reverse-lines": "reverselines",
-    "camel-case": "camel", "snake-case": "snake",
-]
-
-/// Reverse map (id -> preferred alias) for display in `list`.
-let preferredAlias: [String: String] = Dictionary(
-    aliases.map { ($0.value, $0.key) }, uniquingKeysWith: { a, _ in a }
-)
-
-func transform(named key: String) -> ClipTransform? {
-    let id = aliases[key] ?? key
-    return ClipTransform.all.first { $0.id == id }
-}
+// Transform-name resolution (kebab aliases → ids) lives on ClipTransform, shared with
+// the MCP server, so there's one source of truth: ClipTransform.named / .displayName.
 
 func fail(_ message: String, code: Int32) -> Never {
     FileHandle.standardError.write(Data(("mimer: " + message + "\n").utf8))
@@ -72,7 +50,7 @@ func printUsage(to handle: FileHandle) {
 func printList() {
     var lines = ["Available transforms (name — description):"]
     for t in ClipTransform.all {
-        let name = preferredAlias[t.id] ?? t.id
+        let name = ClipTransform.displayName(for: t)
         lines.append("  \(name.padding(toLength: 16, withPad: " ", startingAt: 0)) \(t.name)")
     }
     lines.append("")
@@ -99,7 +77,7 @@ default:
     var rest = args
     if rest.first == "transform" { rest.removeFirst() }
     guard let name = rest.first else { printUsage(to: FileHandle.standardError); exit(64) }
-    guard let t = transform(named: name) else {
+    guard let t = ClipTransform.named(name) else {
         fail("unknown transform '\(name)'. Run `mimer list` to see the options.", code: 2)
     }
     let input = rest.count > 1 ? rest.dropFirst().joined(separator: " ") : readStdin()

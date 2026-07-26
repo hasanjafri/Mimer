@@ -166,8 +166,44 @@ Build it from source (until it ships bundled in the app):
 xcodegen generate
 xcodebuild -project Mimer.xcodeproj -scheme Mimer -configuration Release \
   -destination 'platform=macOS,arch=arm64' build
-# binary at build/Release/mimer (or the scheme's DerivedData Products dir)
+# binaries at build/Release/mimer and build/Release/mimer-mcp
 ```
+
+## AI access — MCP server (`mimer-mcp`)
+
+Mimer ships an [MCP](https://modelcontextprotocol.io) server so a local AI assistant
+(Claude Desktop, Claude Code) can **use** Mimer: run its transforms, and — if you allow
+it — read your recent and searched clips.
+
+**Off by default.** Reading clip history requires you to turn on
+**Settings → Privacy → “Allow local AI tools to read clips.”** While that's off, the app
+opens no port and the server can read nothing — the gate is enforced by the app, not by the
+server's good behavior. Everything stays on your Mac over a local-only channel, and while
+masking is on, detected secrets are hidden from the AI entirely (kept off the surface, not
+just masked, so `search_clips` can't be used to probe them). The **transform** tools work
+with no history access and no toggle. Note: while enabled, the local channel isn't
+authenticated, so any process on your Mac can query it — it's meant to be turned on only
+while you want an assistant to have access.
+
+Tools: `list_transforms`, `transform`, `recent_clips`, `search_clips`.
+
+Connect it (using the `mimer-mcp` you built above):
+
+```jsonc
+// Claude Desktop — ~/Library/Application Support/Claude/claude_desktop_config.json
+{
+  "mcpServers": {
+    "mimer": { "command": "/absolute/path/to/mimer-mcp" }
+  }
+}
+```
+
+```sh
+# Claude Code
+claude mcp add mimer /absolute/path/to/mimer-mcp
+```
+
+Then ask your assistant to, e.g., “find the JSON I copied earlier and turn it into a TypeScript type.”
 
 ## Feedback
 

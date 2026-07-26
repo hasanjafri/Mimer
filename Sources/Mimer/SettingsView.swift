@@ -123,6 +123,14 @@ private struct PrivacySettingsView: View {
             }
 
             Section {
+                Toggle("Allow local AI tools to read clips", isOn: $prefs.mcpEnabled)
+            } header: {
+                Text("AI access (MCP)")
+            } footer: {
+                Text("Off by default. When on, the bundled **mimer-mcp** server can read your recent and searched clips so a local AI assistant (e.g. Claude) can use them. Everything stays on this Mac over a local-only channel, detected secrets are hidden from the AI while masking is on, and turning this off closes it immediately. See the README to connect a client.")
+            }
+
+            Section {
                 if prefs.excludedBundleIDs.isEmpty {
                     Text("No excluded apps.").foregroundStyle(.secondary)
                 } else {

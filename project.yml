@@ -64,6 +64,7 @@ targets:
     dependencies:
       - target: Mimer
       - target: MimerCLI       # build-order only: ensures the CLI binary exists for MimerCLITests
+      - target: MimerMCP       # build-order only: ensures the MCP binary exists for MimerMCPTests
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.hasanjafri.MimerTests
@@ -87,6 +88,24 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.hasanjafri.mimer-cli
         CODE_SIGN_STYLE: Automatic
 
+  # `mimer-mcp` — the Model Context Protocol server (stdio JSON-RPC). Shares
+  # ClipTransform.swift (transforms) and MCPWire.swift (the app IPC protocol) with the
+  # app; talks to the running app over a local Mach port for history tools. Same
+  # module-name caution as MimerCLI.
+  MimerMCP:
+    type: tool
+    platform: macOS
+    sources:
+      - path: Sources/MimerMCP
+      - path: Sources/Mimer/ClipTransform.swift
+      - path: Sources/Mimer/MCPWire.swift
+    settings:
+      base:
+        PRODUCT_NAME: mimer-mcp
+        PRODUCT_MODULE_NAME: MimerMCP
+        PRODUCT_BUNDLE_IDENTIFIER: com.hasanjafri.mimer-mcp
+        CODE_SIGN_STYLE: Automatic
+
 schemes:
   Mimer:
     build:
@@ -94,6 +113,7 @@ schemes:
         Mimer: all
         MimerTests: [test]
         MimerCLI: all
+        MimerMCP: all
     run:
       config: Debug
     test:

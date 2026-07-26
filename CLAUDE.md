@@ -18,7 +18,7 @@ them; change `project.yml` and re-run `xcodegen generate`.
 ```sh
 xcodegen generate
 xcodebuild -project Mimer.xcodeproj -scheme Mimer -configuration Debug \
-  -destination 'platform=macOS,arch=arm64' CODE_SIGNING_ALLOWED=NO test   # 113 tests
+  -destination 'platform=macOS,arch=arm64' CODE_SIGNING_ALLOWED=NO test   # 128 tests
 ```
 
 - Swift 6 toolchain, **Swift 5 language mode** (`SWIFT_VERSION 5.0`) with
@@ -165,6 +165,19 @@ Typical loop: edit → `xcodebuild build` → relaunch the Debug app → drive v
   issue is the feedback channel). `bugReportURL` deep-links `bug_report.yml` with the Mimer
   version + macOS version/arch prefilled into the form's field IDs (kept in sync by
   `FeedbackTests`); `discussionsURL` for ideas. Wired into the menu footer + Settings → About.
+- **`mimer-mcp` MCP server** (`Sources/MimerMCP/main.swift`, target `MimerMCP`, binary `mimer-mcp`)
+  — a stdio JSON-RPC MCP server so a local AI client (Claude Desktop/Code) can use Mimer.
+  Tools: `list_transforms`/`transform` (stateless, share `ClipTransform.swift`) and
+  `recent_clips`/`search_clips` (history). History tools reach the running app over a **local
+  CFMessagePort** (`MCPWire.portName`); the wire protocol (`MCPWire.swift`, Codable) is shared by
+  both targets. **The opt-in gate is app-side:** `MCPBridge` (`@MainActor`) registers the port
+  **only when `Preferences.mcpEnabled` is on (default off)** — Settings → Privacy toggle — so
+  while off there's no port and the server reads nothing. `MCPBridge.respond(...)` is the pure,
+  exhaustively-tested gate core (honors the enable flag, filters images, caps at 100, and —
+  while `maskSecrets` is on — keeps detected secrets **off the surface entirely**, not just
+  masked: search matches full text, so returning secret clips would make `search_clips` an
+  oracle that reconstructs them). Same `PRODUCT_MODULE_NAME` case-collision caution as MimerCLI.
+  Build-from-source for now; bundling in the notarized `.app` is a later dry-run-gated PR.
 - `Onboarding*`, `Settings*` (General / Privacy / Developer / About — General has a
   `KeyboardShortcuts.Recorder` to rebind the ⇧⌘V palette hotkey), `SnippetComposer*`,
   `Preferences`, `LaunchAtLogin` (SMAppService), `UpdaterController` (Sparkle),
