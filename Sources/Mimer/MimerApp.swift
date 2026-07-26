@@ -41,6 +41,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         PaletteController.shared.setup()
         OnboardingWindowController.shared.showIfNeeded()
         _ = UpdaterController.shared   // start Sparkle's auto-update checks
+        MCPBridge.shared.activate()    // opens a local port only if the user opted in (default off)
         #if DEBUG
         DebugBridge.shared.start()
         #endif

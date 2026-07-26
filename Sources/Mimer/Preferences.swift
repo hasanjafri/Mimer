@@ -38,6 +38,12 @@ final class Preferences: ObservableObject {
         didSet { defaults.set(maskSecrets, forKey: Keys.maskSecrets) }
     }
 
+    /// Opt-in: expose clip history to local AI tools via the `mimer-mcp` server. **Default off** —
+    /// while off the app registers no IPC port, so an MCP client can read nothing. See `MCPBridge`.
+    @Published var mcpEnabled: Bool {
+        didSet { defaults.set(mcpEnabled, forKey: Keys.mcpEnabled) }
+    }
+
     // MARK: - Developer integrations (⌘O "act on") — all optional/empty by default.
 
     /// Remote base for git-SHA clips, e.g. `github.com/acme/app` → opens `…/commit/<sha>`.
@@ -70,6 +76,7 @@ final class Preferences: ObservableObject {
         static let isPaused = "isPaused"
         static let excludedBundleIDs = "excludedBundleIDs"
         static let maskSecrets = "maskSecrets"
+        static let mcpEnabled = "mcpEnabled"
         static let gitRemoteBase = "gitRemoteBase"
         static let issueTrackerTemplate = "issueTrackerTemplate"
         static let editorKind = "editorKind"
@@ -82,6 +89,7 @@ final class Preferences: ObservableObject {
         isPaused = defaults.bool(forKey: Keys.isPaused)
         excludedBundleIDs = Set(defaults.stringArray(forKey: Keys.excludedBundleIDs) ?? [])
         maskSecrets = defaults.object(forKey: Keys.maskSecrets) as? Bool ?? true   // default on
+        mcpEnabled = defaults.bool(forKey: Keys.mcpEnabled)   // default off (bool defaults to false)
         gitRemoteBase = defaults.string(forKey: Keys.gitRemoteBase) ?? ""
         issueTrackerTemplate = defaults.string(forKey: Keys.issueTrackerTemplate) ?? ""
         editorKind = defaults.string(forKey: Keys.editorKind) ?? ""

@@ -311,3 +311,38 @@ struct ClipTransform: Identifiable, Sendable {
         return w.map { $0.lowercased() }.joined(separator: "_")
     }
 }
+
+// MARK: - Friendly names (shared by the `mimer` CLI and the MCP server)
+
+extension ClipTransform {
+    /// Kebab alias → transform id, so a caller can use `json-to-ts` instead of the terse
+    /// internal id `json2ts`. One source of truth for both the CLI and the MCP server.
+    static let aliasToID: [String: String] = [
+        "uppercase": "upper", "lowercase": "lower", "title-case": "title",
+        "trim": "trim", "slugify": "slug",
+        "base64-encode": "b64enc", "base64-decode": "b64dec",
+        "url-encode": "urlenc", "url-decode": "urldec",
+        "json-pretty": "jsonpretty", "json-minify": "jsonmin",
+        "decode-jwt": "jwt", "strip-tracking": "urlstrip", "decode-query": "urlquery",
+        "unix-to-iso": "epoch2iso", "iso-to-unix": "iso2epoch",
+        "json-to-ts": "json2ts",
+        "sort-lines": "sortlines", "dedupe-lines": "dedupelines", "reverse-lines": "reverselines",
+        "camel-case": "camel", "snake-case": "snake",
+    ]
+
+    /// id → preferred display alias (for `list` output).
+    static let idToAlias: [String: String] = Dictionary(
+        aliasToID.map { ($0.value, $0.key) }, uniquingKeysWith: { first, _ in first }
+    )
+
+    /// Resolve a transform by its kebab alias or its raw id.
+    static func named(_ key: String) -> ClipTransform? {
+        let id = aliasToID[key] ?? key
+        return all.first { $0.id == id }
+    }
+
+    /// The friendly name to show for a transform (its alias, else its id).
+    static func displayName(for transform: ClipTransform) -> String {
+        idToAlias[transform.id] ?? transform.id
+    }
+}
