@@ -160,14 +160,11 @@ pbpaste | mimer slugify | pbcopy
 mimer list                                       # every transform
 ```
 
-Build it from source (until it ships bundled in the app):
-
-```sh
-xcodegen generate
-xcodebuild -project Mimer.xcodeproj -scheme Mimer -configuration Release \
-  -destination 'platform=macOS,arch=arm64' build
-# binaries at build/Release/mimer and build/Release/mimer-mcp
-```
+`mimer` (and `mimer-mcp`, below) ship **inside the app**. Put them on your `PATH` with one
+click: **Settings → Developer → Install Command-Line Tools**, which symlinks them into
+`/usr/local/bin` (if that isn't writable, it copies the `ln -s …` commands to your clipboard
+so you can run them yourself). They live at `Mimer.app/Contents/Resources/mimer` if you'd
+rather link them by hand.
 
 ## AI access — MCP server (`mimer-mcp`)
 
@@ -187,20 +184,21 @@ while you want an assistant to have access.
 
 Tools: `list_transforms`, `transform`, `recent_clips`, `search_clips`.
 
-Connect it (using the `mimer-mcp` you built above):
+Connect it (install the tools first, then use the `/usr/local/bin/mimer-mcp` symlink — or the
+`Mimer.app/Contents/Resources/mimer-mcp` path directly):
 
 ```jsonc
 // Claude Desktop — ~/Library/Application Support/Claude/claude_desktop_config.json
 {
   "mcpServers": {
-    "mimer": { "command": "/absolute/path/to/mimer-mcp" }
+    "mimer": { "command": "/usr/local/bin/mimer-mcp" }
   }
 }
 ```
 
 ```sh
 # Claude Code
-claude mcp add mimer /absolute/path/to/mimer-mcp
+claude mcp add mimer /usr/local/bin/mimer-mcp
 ```
 
 Then ask your assistant to, e.g., “find the JSON I copied earlier and turn it into a TypeScript type.”

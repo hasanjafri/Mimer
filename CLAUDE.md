@@ -18,7 +18,7 @@ them; change `project.yml` and re-run `xcodegen generate`.
 ```sh
 xcodegen generate
 xcodebuild -project Mimer.xcodeproj -scheme Mimer -configuration Debug \
-  -destination 'platform=macOS,arch=arm64' CODE_SIGNING_ALLOWED=NO test   # 128 tests
+  -destination 'platform=macOS,arch=arm64' CODE_SIGNING_ALLOWED=NO test   # 130 tests
 ```
 
 - Swift 6 toolchain, **Swift 5 language mode** (`SWIFT_VERSION 5.0`) with
@@ -177,7 +177,14 @@ Typical loop: edit → `xcodebuild build` → relaunch the Debug app → drive v
   while `maskSecrets` is on — keeps detected secrets **off the surface entirely**, not just
   masked: search matches full text, so returning secret clips would make `search_clips` an
   oracle that reconstructs them). Same `PRODUCT_MODULE_NAME` case-collision caution as MimerCLI.
-  Build-from-source for now; bundling in the notarized `.app` is a later dry-run-gated PR.
+- **CLI/MCP distribution** — both tools are **bundled in the app** (`Contents/Resources`, via
+  Code Sign On Copy so a notarized release ships them signed + hardened-runtime). **Gotcha #2:**
+  destination is Resources, NOT Executables (`Contents/MacOS`) — a binary named `mimer` collides
+  with the app's own `Mimer` executable on case-insensitive APFS and clobbers it. `CLITools`
+  resolves them from `Bundle.main.resourceURL` and the **Settings → Developer → Install
+  Command-Line Tools** button symlinks them into `/usr/local/bin` (clipboard fallback if it's
+  not writable). `CLIToolsTests` (app-hosted, so `Bundle.main` = the app) guards the embedding.
+  The two `tool` targets build automatically as app copy-dependencies (no scheme entry needed).
 - `Onboarding*`, `Settings*` (General / Privacy / Developer / About — General has a
   `KeyboardShortcuts.Recorder` to rebind the ⇧⌘V palette hotkey), `SnippetComposer*`,
   `Preferences`, `LaunchAtLogin` (SMAppService), `UpdaterController` (Sparkle),
