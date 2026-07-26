@@ -63,10 +63,29 @@ targets:
       - path: Tests/MimerTests
     dependencies:
       - target: Mimer
+      - target: MimerCLI       # build-order only: ensures the CLI binary exists for MimerCLITests
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.hasanjafri.MimerTests
         GENERATE_INFOPLIST_FILE: YES
+
+  # `mimer` command-line tool. Shares ClipTransform.swift verbatim with the app
+  # (no dependency on the app target, no KeyboardShortcuts/Sparkle) so the transform
+  # engine has one source of truth. Pure Foundation; touches no clipboard history.
+  # Target is MimerCLI (not `mimer`) to avoid a case-insensitive-filesystem clash
+  # with the Mimer app's swiftmodule; PRODUCT_NAME keeps the binary named `mimer`.
+  MimerCLI:
+    type: tool
+    platform: macOS
+    sources:
+      - path: Sources/MimerCLI
+      - path: Sources/Mimer/ClipTransform.swift
+    settings:
+      base:
+        PRODUCT_NAME: mimer                # the invoked binary is `mimer`
+        PRODUCT_MODULE_NAME: MimerCLI       # module name must differ from `Mimer` — else mimer.swiftmodule clobbers Mimer.swiftmodule on case-insensitive APFS
+        PRODUCT_BUNDLE_IDENTIFIER: com.hasanjafri.mimer-cli
+        CODE_SIGN_STYLE: Automatic
 
 schemes:
   Mimer:
@@ -74,6 +93,7 @@ schemes:
       targets:
         Mimer: all
         MimerTests: [test]
+        MimerCLI: all
     run:
       config: Debug
     test:

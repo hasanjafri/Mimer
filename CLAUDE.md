@@ -18,7 +18,7 @@ them; change `project.yml` and re-run `xcodegen generate`.
 ```sh
 xcodegen generate
 xcodebuild -project Mimer.xcodeproj -scheme Mimer -configuration Debug \
-  -destination 'platform=macOS,arch=arm64' CODE_SIGNING_ALLOWED=NO test   # 28 tests
+  -destination 'platform=macOS,arch=arm64' CODE_SIGNING_ALLOWED=NO test   # 113 tests
 ```
 
 - Swift 6 toolchain, **Swift 5 language mode** (`SWIFT_VERSION 5.0`) with
@@ -131,6 +131,19 @@ Typical loop: edit → `xcodebuild build` → relaunch the Debug app → drive v
   lines** (multi-line-gated). Developer (gated): Decode JWT, Strip tracking params, Decode
   query string, Unix↔ISO 8601. `applicable(to:)` hides no-ops/inapplicable. This is the wedge
   — extend here per `docs/ROADMAP.md` (diff two clips, chains, paste-as-plain next).
+  **`ClipTransform.swift` is pure `Foundation` (no AppKit/CoreData/app types) on purpose** so
+  the `mimer` CLI can share it verbatim.
+- **`mimer` CLI** (`Sources/MimerCLI/main.swift`, target `MimerCLI`) — a `type: tool` target
+  that compiles `ClipTransform.swift` directly (shared, one source of truth; no dep on the app
+  target, no KeyboardShortcuts/Sparkle). Applies a transform to an arg or stdin → stdout;
+  `mimer list`/`help`/`version`; kebab aliases (`json-to-ts`→`json2ts`). Pure Foundation,
+  touches **no** clipboard history — the agent-callable surface (Layer 3 of the AI-discovery
+  plan; history verbs + distribution-in-the-.app come later). **Gotcha:** the target is named
+  `MimerCLI` (not `mimer`) and sets `PRODUCT_MODULE_NAME: MimerCLI` — the module/swiftmodule
+  name follows `PRODUCT_NAME`, and `mimer.swiftmodule` would clobber `Mimer.swiftmodule` on
+  case-insensitive APFS, breaking `@testable import Mimer`. Only `PRODUCT_NAME` is `mimer` (the
+  binary). `MimerCLITests` runs the real binary (climbs up from the app-hosted `.xctest` to the
+  products dir; XCTSkips if absent).
 - `SearchQuery` — parses the palette search box into composable filters: `type:<kind>`
   (link/code/color/sha/issue/file/snippet/image), `type:secret`/`is:secret` (live detection,
   works on old clips), `is:fav`, `app:<name>` (case-insensitive substring of the capturing
