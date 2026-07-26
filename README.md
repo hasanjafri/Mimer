@@ -145,6 +145,30 @@ global hotkey. The Xcode project is generated from `project.yml` via
 [XcodeGen](https://github.com/yonaskolb/XcodeGen) (so the `.xcodeproj` is not
 committed). See [`docs/`](docs/) for the research, design, plan, and reviews.
 
+## Command-line tool (`mimer`)
+
+Mimer ships a tiny `mimer` CLI that exposes the same **⌘K transform engine** as
+the app (the exact `ClipTransform` code, shared — no duplication). It's the Unix
+thing: read text from an argument or stdin, write the result to stdout. It touches
+no clipboard history and needs no running app — a pure function over text, so any
+script or terminal AI agent can call it.
+
+```sh
+echo '{"id":1,"name":"a"}' | mimer json-to-ts   # → interface Root { … }
+mimer decode-jwt "$TOKEN"
+pbpaste | mimer slugify | pbcopy
+mimer list                                       # every transform
+```
+
+Build it from source (until it ships bundled in the app):
+
+```sh
+xcodegen generate
+xcodebuild -project Mimer.xcodeproj -scheme Mimer -configuration Release \
+  -destination 'platform=macOS,arch=arm64' build
+# binary at build/Release/mimer (or the scheme's DerivedData Products dir)
+```
+
 ## Feedback
 
 Mimer collects **no telemetry** — the only way your experience reaches me is if you
