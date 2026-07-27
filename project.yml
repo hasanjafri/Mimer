@@ -100,6 +100,7 @@ targets:
         PRODUCT_MODULE_NAME: MimerCLI       # module name must differ from `Mimer` — else mimer.swiftmodule clobbers Mimer.swiftmodule on case-insensitive APFS
         PRODUCT_BUNDLE_IDENTIFIER: com.hasanjafri.mimer-cli
         CODE_SIGN_STYLE: Automatic
+        SKIP_INSTALL: YES                   # embed via the app's copy phase only — do NOT add a loose /usr/local/bin product to the archive (breaks -exportArchive method detection)
 
   # `mimer-mcp` — the Model Context Protocol server (stdio JSON-RPC). Shares
   # ClipTransform.swift (transforms) and MCPWire.swift (the app IPC protocol) with the
@@ -118,6 +119,7 @@ targets:
         PRODUCT_MODULE_NAME: MimerMCP
         PRODUCT_BUNDLE_IDENTIFIER: com.hasanjafri.mimer-mcp
         CODE_SIGN_STYLE: Automatic
+        SKIP_INSTALL: YES                   # embed via the app's copy phase only — see MimerCLI note
 
 schemes:
   Mimer:
