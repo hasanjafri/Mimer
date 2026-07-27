@@ -6,6 +6,21 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-27
+
+### Added
+- **`mimer` command-line tool** — run Mimer's ⌘K transforms in a terminal or a script:
+  `echo '{"id":1}' | mimer json-to-ts`, `mimer decode-jwt "$TOKEN"`, `mimer list`. Shares the
+  app's exact transform engine; touches no clipboard history.
+- **AI access via MCP** — an opt-in `mimer-mcp` [Model Context Protocol](https://modelcontextprotocol.io)
+  server lets a local AI assistant (Claude Desktop/Code) run Mimer's transforms and — only when
+  you turn it on — read your recent and searched clips. **Off by default** (Settings → Privacy);
+  local-only; while masking is on, detected secrets are kept off the AI entirely.
+- **Bundled tools + one-click install** — `mimer` and `mimer-mcp` ship inside the app; install
+  them to your PATH from **Settings → Developer → Install Command-Line Tools**.
+- **In-app feedback** — a **Send Feedback** item in the menu bar and Settings → About opens a
+  pre-filled bug report (Mimer version + macOS auto-filled); GitHub Discussions for ideas.
+
 ## [0.2.2] - 2026-06-22
 
 ### Added
@@ -49,7 +64,8 @@ First public release — a fast, private, developer-first clipboard manager for 
 - Pause, per-app exclusions, a built-in password-manager blocklist.
 - Optional auto-paste, launch at login, and auto-update (Sparkle). Local-only, no telemetry. MIT.
 
-[Unreleased]: https://github.com/hasanjafri/Mimer/compare/v0.2.2...HEAD
+[Unreleased]: https://github.com/hasanjafri/Mimer/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/hasanjafri/Mimer/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/hasanjafri/Mimer/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/hasanjafri/Mimer/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/hasanjafri/Mimer/compare/v0.1.0...v0.2.0
