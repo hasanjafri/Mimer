@@ -7,6 +7,14 @@
         <!-- Release <item>s are generated + signed by Sparkle's generate_appcast at
          release time (run by scripts/release.sh); commit the updated file. -->
         <item>
+            <title>0.3.0</title>
+            <pubDate>Mon, 27 Jul 2026 15:31:19 +0000</pubDate>
+            <sparkle:version>84</sparkle:version>
+            <sparkle:shortVersionString>0.3.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <enclosure url="https://github.com/hasanjafri/Mimer/releases/download/v0.3.0/Mimer-0.3.0.dmg" length="2923284" type="application/octet-stream" sparkle:edSignature="FagkOPCvT0O+w3ANKzA3XkrjOKlz117mp9Ogq9Hqn93FGH+2vashelAvICBrzTrkfXshUIPr0+twzhJZO1WbDQ=="/>
+        </item>
+        <item>
             <title>0.2.2</title>
             <pubDate>Mon, 22 Jun 2026 04:10:18 +0000</pubDate>
             <sparkle:version>73</sparkle:version>
@@ -21,14 +29,6 @@
             <sparkle:shortVersionString>0.2.1</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
             <enclosure url="https://github.com/hasanjafri/Mimer/releases/download/v0.2.1/Mimer-0.2.1.dmg" length="2416411" type="application/octet-stream" sparkle:edSignature="NSbBQ+feS3Ut5kq8F7WcpK4+iB11FiDvxeNw4M7OxxzRjR04iT4foHweX7MGFoWxTT3KMfZFOCSdIXt1qOeaBw=="/>
-        </item>
-        <item>
-            <title>0.2.0</title>
-            <pubDate>Sun, 21 Jun 2026 05:00:44 +0000</pubDate>
-            <sparkle:version>0.2.0</sparkle:version>
-            <sparkle:shortVersionString>0.2.0</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <enclosure url="https://github.com/hasanjafri/Mimer/releases/download/v0.2.0/Mimer-0.2.0.dmg" length="2416434" type="application/octet-stream" sparkle:edSignature="fb1SRfwROt4HucZHGK446vTTR7srsFXV9jLZ1+wW4yOmhtDC2QMau16xR/v/S3d/M/2L5caj2VvoH2yR5OfcCw=="/>
         </item>
     </channel>
 </rss>
