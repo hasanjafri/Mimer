@@ -123,13 +123,19 @@ struct ClipInspectorCard: View {
         HStack(spacing: 8) {
             rule
             Text(hiddenMatches > 0
-                 ? "\(count.formatted()) more characters · \(hiddenMatches) match\(hiddenMatches == 1 ? "" : "es") hidden"
+                 ? "\(count.formatted()) more characters · \(hiddenMatchLabel(hiddenMatches)) hidden"
                  : "\(count.formatted()) more characters")
                 .font(.caption2.monospacedDigit())
                 .foregroundStyle(.tertiary)
                 .fixedSize()
             rule
         }
+    }
+
+    /// At the counting ceiling say "500+" — a card should never state a number it didn't count.
+    private func hiddenMatchLabel(_ count: Int) -> String {
+        if count >= ClipInspector.hiddenMatchCap { return "\(count)+ matches" }
+        return "\(count) match\(count == 1 ? "" : "es")"
     }
 
     private var rule: some View { Rectangle().fill(Color.primary.opacity(0.10)).frame(height: 0.5) }

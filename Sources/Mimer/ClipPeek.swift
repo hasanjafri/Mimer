@@ -103,7 +103,9 @@ final class ClipPeek {
                       host: NSWindow?, anchor: Anchor, delay: TimeInterval) {
         guard Preferences.shared.previewOnHover else { return }
         exitGrace?.invalidate(); exitGrace = nil   // before the early return: re-entering the same row cancels its pending exit
-        guard shownID != item.id || !isVisible else { return }   // already showing this clip
+        // Already showing this clip — but a change of anchor is a change of ownership (the
+        // keyboard taking over a card the pointer opened), so that re-presents.
+        guard shownID != item.id || !isVisible || anchoredToPointer != anchor.isPointer else { return }
 
         let inspector = ClipInspector.make(for: item,
                                            maskSecrets: Preferences.shared.maskSecrets,
@@ -128,6 +130,9 @@ final class ClipPeek {
     private func present() {
         guard let pending else { return }
         dwell?.invalidate(); dwell = nil
+        // The card was built when the dwell started; if masking has been switched on since, it
+        // holds a secret it may no longer show. Drop it rather than present and then retract.
+        guard Preferences.shared.maskSecrets == maskedWhenShown else { hide(reason: "masking-changed"); return }
 
         let panel = self.panel ?? ClipPeekPanel()
         self.panel = panel

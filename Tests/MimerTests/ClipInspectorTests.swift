@@ -207,6 +207,17 @@ final class ClipInspectorTests: XCTestCase {
         XCTAssertFalse(preview.tail.contains("needle"))
     }
 
+    /// The count must never be the cap dressed up as a real number.
+    func testHiddenMatchCountIsCappedNotTruncatedSilently() {
+        let middle = String(repeating: "needle ", count: 900)
+        let item = clip(String(repeating: "a", count: 700) + " " + middle + String(repeating: "b", count: 700))
+        guard case .text(let preview) = ClipInspector.make(for: item, maskSecrets: true,
+                                                           query: "needle").content else {
+            return XCTFail("expected a text preview")
+        }
+        XCTAssertEqual(preview.hiddenMatches, ClipInspector.hiddenMatchCap)
+    }
+
     func testVisibleMatchesAreNotCountedAsHidden() {
         let item = clip("needle " + String(repeating: "a", count: 2000))
         guard case .text(let preview) = ClipInspector.make(for: item, maskSecrets: true,

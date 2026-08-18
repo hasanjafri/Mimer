@@ -1,6 +1,12 @@
 import XCTest
 @testable import Mimer
 
+/// The spans a format produces, as (text, style) pairs — the readable form for assertions.
+private func styledSpans(_ text: String, _ format: ClipSyntax.Format) -> [(String, ClipSyntax.Style)] {
+    let characters = Array(text)
+    return ClipSyntax.spans(for: text, format: format).map { (String(characters[$0.range]), $0.style) }
+}
+
 /// Content-aware formatting inside the preview card. The rule these guard: the card may
 /// re-*wrap* a clip, never re-*write* it, and it never colours something it hasn't identified.
 final class ClipSyntaxTests: XCTestCase {
@@ -64,10 +70,7 @@ final class ClipSyntaxTests: XCTestCase {
     // MARK: - Spans
 
     private func styles(_ text: String, _ format: ClipSyntax.Format) -> [(String, ClipSyntax.Style)] {
-        let characters = Array(text)
-        return ClipSyntax.spans(for: text, format: format).map {
-            (String(characters[$0.range]), $0.style)
-        }
+        styledSpans(text, format)
     }
 
     func testDiffSpansMarkEachLineByItsRole() {
@@ -183,8 +186,31 @@ final class ClipInspectorBadgeTests: XCTestCase {
     }
 
     func testFileHeadersAloneAreNotAChange() {
-        // +++/--- are headers, not added/removed lines: they must not fake a diff on their own.
+        // `+++ path` / `--- path` are headers, not added/removed lines: they must not fake a diff.
         XCTAssertFalse(ClipSyntax.looksLikeDiff("@@ -1 +1 @@\n+++ b/x\n--- a/x"))
+    }
+
+    /// A patch whose only change is a line that *starts* with the marker — a Markdown rule, a
+    /// YAML document marker — is still a patch. The space after `---` is what makes it a header.
+    func testMarkerShapedContentIsStillAChange() {
+        XCTAssertTrue(ClipSyntax.looksLikeDiff("@@ -1,0 +1 @@\n+---"))
+        XCTAssertTrue(ClipSyntax.looksLikeDiff("@@ -1 +1,0 @@\n----"))
+        XCTAssertFalse(ClipSyntax.isFileHeader("+---"))
+        XCTAssertTrue(ClipSyntax.isFileHeader("--- a/Sources/x.swift"))
+    }
+
+    func testMarkerShapedContentKeepsItsColour() {
+        let patch = "@@ -1,2 +1,2 @@\n+---\n--- a/x"
+        let found = styledSpans(patch, .diff)
+        XCTAssertTrue(found.contains { $0 == ("+---", .added) }, "added content, not a header")
+        XCTAssertTrue(found.contains { $0 == ("--- a/x", .meta) }, "real header")
+    }
+
+    func testPercentEncodedTrackingNamesMatchTheTransform() {
+        let url = "https://x.com/a?utm%5Fsource=news&keep=1"
+        let found = styledSpans(url, .url)
+        XCTAssertTrue(found.contains { $0.1 == .tracking && $0.0.contains("utm%5Fsource") },
+                      "⌘K sees the decoded name, so the card must too")
     }
 
     func testFragmentsAreNotTracking() {

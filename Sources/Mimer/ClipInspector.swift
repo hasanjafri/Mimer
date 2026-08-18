@@ -57,6 +57,9 @@ struct ClipInspector: Equatable, Sendable {
     static let structuredLineBudget = 24
     /// Below this much hidden content, showing the clip whole beats eliding it.
     static let elisionSlack = 100
+    /// Ceiling on the hidden-match count. At the ceiling the card says "500+", never a
+    /// precise-looking number that is really just the cap.
+    static let hiddenMatchCap = 500
 
     static func make(for item: ClipItem,
                      maskSecrets: Bool,
@@ -119,7 +122,7 @@ struct ClipInspector: Equatable, Sendable {
         let display = displayText(body)
         guard display.count > preview.head.count + preview.tail.count else { return 0 }
         let middle = display.dropFirst(preview.head.count).dropLast(preview.tail.count)
-        return highlightRanges(in: String(middle), query: query).count
+        return highlightRanges(in: String(middle), query: query, limit: hiddenMatchCap).count
     }
 
     // MARK: - Kind

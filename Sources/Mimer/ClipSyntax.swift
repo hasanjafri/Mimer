@@ -47,9 +47,15 @@ enum ClipSyntax {
         if lines[0].hasPrefix("diff --git ") { return true }
         let hunk = lines.contains { $0.hasPrefix("@@") && $0.dropFirst(2).contains("@@") }
         // Either marker is enough: plenty of real hunks only add, or only delete.
-        let changes = lines.contains { $0.hasPrefix("+") && !$0.hasPrefix("+++") }
-            || lines.contains { $0.hasPrefix("-") && !$0.hasPrefix("---") }
+        let changes = lines.contains { ($0.hasPrefix("+") || $0.hasPrefix("-")) && !isFileHeader($0) }
         return hunk && changes
+    }
+
+    /// `--- a/path` / `+++ b/path` are git's file headers; a bare `---` or `+++foo` is a line the
+    /// patch actually adds or removes (a Markdown rule, a YAML marker). The space is what tells
+    /// them apart, so content that merely starts with the marker keeps its colour.
+    static func isFileHeader<S: StringProtocol>(_ line: S) -> Bool {
+        line.hasPrefix("--- ") || line.hasPrefix("+++ ")
     }
 
     static func isJSON(_ text: String) -> Bool {
@@ -119,7 +125,7 @@ enum ClipSyntax {
             let length = line.count
             let style: Style?
             if line.hasPrefix("@@") { style = .hunk }
-            else if line.hasPrefix("+++") || line.hasPrefix("---") || line.hasPrefix("diff ") || line.hasPrefix("index ") { style = .meta }
+            else if isFileHeader(line) || line.hasPrefix("diff ") || line.hasPrefix("index ") { style = .meta }
             else if line.hasPrefix("+") { style = .added }
             else if line.hasPrefix("-") { style = .removed }
             else { style = nil }
@@ -173,7 +179,10 @@ enum ClipSyntax {
         var start = paramsStart
         while start < end {
             let next = indexOf("&", in: c, from: start).flatMap { $0 < end ? $0 : nil } ?? end
-            let name = String(c[start..<next]).split(separator: "=", maxSplits: 1).first.map(String.init) ?? ""
+            let raw = String(c[start..<next]).split(separator: "=", maxSplits: 1).first.map(String.init) ?? ""
+            // ⌘K sees decoded names (URLComponents decodes them), so decode here too or the
+            // card would disagree with the transform on `utm%5Fsource`.
+            let name = raw.removingPercentEncoding ?? raw
             if isTrackingParameter(name) { spans.append(Span(range: start..<next, style: .tracking)) }
             start = next + 1
         }
