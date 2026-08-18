@@ -45,8 +45,9 @@ enum ClipSyntax {
         let lines = text.split(separator: "\n", omittingEmptySubsequences: false)
         guard lines.count >= 2 else { return false }
         if lines[0].hasPrefix("diff --git ") { return true }
+        guard lines.contains(where: isHunkHeader) else { return false }   // whole clips need a hunk header
         let roles = diffRoles(text)
-        return roles.contains(.hunk) && roles.contains { $0 == .added || $0 == .removed }
+        return roles.contains { $0 == .added || $0 == .removed }
     }
 
     /// The role of every line in a patch, in order — the one classifier behind diff detection,
@@ -56,13 +57,20 @@ enum ClipSyntax {
     /// and before that file's first `@@`. Position, not shape, is what separates them from
     /// identical-looking content (a removed line whose own text began with `-- `).
     static func diffRoles(_ text: String) -> [Style?] {
+        let lines = text.split(separator: "\n", omittingEmptySubsequences: false)
+
+        // The card lexes the previewed head and tail separately, so this is often a *fragment*
+        // of a patch. A fragment with no hunk header of its own is mid-hunk content — start there,
+        // or the tail of a long diff (the part the preview exists to show) would read as headers.
+        var inHeaderBlock = lines.contains(where: isHunkHeader)
+            || lines.first.map { $0.hasPrefix("diff ") || $0.hasPrefix("index ") } == true
+
         var roles: [Style?] = []
-        var inHeaderBlock = true      // a patch can open with ---/+++ (plain `diff -u` output)
-        for line in text.split(separator: "\n", omittingEmptySubsequences: false) {
+        for line in lines {
             if line.hasPrefix("diff ") {
                 inHeaderBlock = true                  // a new file's headers begin
                 roles.append(.meta)
-            } else if line.hasPrefix("@@"), line.dropFirst(2).contains("@@") {
+            } else if isHunkHeader(line) {
                 inHeaderBlock = false
                 roles.append(.hunk)
             } else if inHeaderBlock {
@@ -76,6 +84,10 @@ enum ClipSyntax {
             }
         }
         return roles
+    }
+
+    static func isHunkHeader<S: StringProtocol>(_ line: S) -> Bool {
+        line.hasPrefix("@@") && line.dropFirst(2).contains("@@")
     }
 
     static func isJSON(_ text: String) -> Bool {

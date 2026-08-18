@@ -210,6 +210,22 @@ final class ClipInspectorBadgeTests: XCTestCase {
         XCTAssertTrue(found.contains { $0 == ("+++ b/x", .added) })
     }
 
+    /// The elided *tail* of a long patch has no hunk header of its own — it must still read as
+    /// changes, not as metadata. This is the part the preview card exists to show.
+    func testTheTailOfALongDiffKeepsItsColours() {
+        let tail = "+        watchdog.start()\n-        watchdog.stop()\n         return true"
+        let byStyle = Dictionary(grouping: styledSpans(tail, .diff), by: \.1).mapValues { $0.count }
+        XCTAssertEqual(byStyle[.added], 1)
+        XCTAssertEqual(byStyle[.removed], 1)
+        XCTAssertNil(byStyle[.meta], "a mid-hunk fragment has no headers in it")
+    }
+
+    func testAHeaderOnlyFragmentStillReadsAsHeaders() {
+        let head = "diff --git a/x b/x\nindex 1111111..2222222 100644"
+        let byStyle = Dictionary(grouping: styledSpans(head, .diff), by: \.1).mapValues { $0.count }
+        XCTAssertEqual(byStyle[.meta], 2)
+    }
+
     func testRealFileHeadersAreMetadata() {
         let patch = """
         diff --git a/x b/x
@@ -253,14 +269,25 @@ final class ClipInspectorBadgeTests: XCTestCase {
         XCTAssertEqual(ClipInspector.trackingParameterCount(in: url), 1, "and the badge agrees")
     }
 
-    /// The badge is defined as a count of the highlighted spans, so the two cannot drift apart.
-    func testBadgeCountsExactlyWhatIsHighlighted() {
-        for url in ["https://x.com/a?utm_source=n&plan=pro&fbclid=z",
-                    "https://x.com/a?utm_source=n#utm_source=notaparam",
-                    "https://x.com/a?keep=1",
-                    "https://x.com/a"] {
+    /// The badge must state the number the card actually highlights. Asserted against the badge
+    /// *string* — comparing `trackingParameterCount` to the spans would just re-run its own
+    /// definition and could never fail.
+    func testBadgeStatesWhatTheCardHighlights() {
+        let cases = ["https://x.com/a?utm_source=n&plan=pro&fbclid=z": "2 tracking params",
+                     "https://x.com/a?utm%5Fsource=n": "1 tracking param",
+                     "https://x.com/a?utm_source=n#utm_source=notaparam": "1 tracking param",
+                     "https://x.com/a?keep=1": nil,
+                     "https://x.com/a": nil]
+        for (url, expected) in cases {
+            XCTAssertEqual(ClipInspector.badge(for: url, format: .url), expected, url)
+
+            // …and the badge the card *renders* must equal the badge implied by the spans it
+            // paints, built here independently of how the badge computes its number.
             let highlighted = styledSpans(url, .url).filter { $0.1 == .tracking }.count
-            XCTAssertEqual(ClipInspector.trackingParameterCount(in: url), highlighted, url)
+            let impliedByHighlights = highlighted == 0
+                ? nil
+                : "\(highlighted) tracking param\(highlighted == 1 ? "" : "s")"
+            XCTAssertEqual(ClipInspector.badge(for: url, format: .url), impliedByHighlights, url)
         }
     }
 

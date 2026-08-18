@@ -185,6 +185,9 @@ final class DebugBridge {
                app: "Terminal"),
         sample("""
             diff --git a/Sources/Mimer/ClipPeek.swift b/Sources/Mimer/ClipPeek.swift
+            index 1111111..2222222 100644
+            --- a/Sources/Mimer/ClipPeek.swift
+            +++ b/Sources/Mimer/ClipPeek.swift
             @@ -42,7 +42,9 @@ final class ClipPeek {
                  func hover(_ item: ClipItem) {
             -        show(item, delay: 0.2)
@@ -192,6 +195,26 @@ final class DebugBridge {
             +        show(item, delay: Self.hoverDelay)
             +        // the pointer owns this card now
             +        watchdog.start(anchoredToPointer: true)
+                 }
+
+            @@ -84,10 +86,14 @@ final class ClipPeek {
+                 private func present() {
+            -        guard let pending else { return }
+            +        guard let pending, Preferences.shared.maskSecrets == maskedWhenShown else { return }
+                     let panel = self.panel ?? ClipPeekPanel()
+            -        panel.contentView = NSHostingView(rootView: pending.card)
+            +        let hosting = NSHostingView(rootView: pending.card)
+            +        panel.contentView = hosting
+            +        hosting.layoutSubtreeIfNeeded()
+                     panel.orderFrontRegardless()
+                 }
+
+            @@ -120,6 +126,9 @@ final class ClipPeek {
+                 private func checkStillValid() {
+            -        guard let host, host.isVisible else { hide(); return }
+            +        guard let host else { return pointerDrifted() ? hide() : () }
+            +        guard host.isVisible else { hide(reason: "host-gone"); return }
+            +        if anchoredToPointer, !host.frame.contains(NSEvent.mouseLocation) { hide() }
                  }
             """, app: "Xcode"),
         sample("""
