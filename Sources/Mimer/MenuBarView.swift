@@ -145,6 +145,7 @@ struct MenuBarView: View {
             // Star stays mounted (even during the copied flash) so favoriting is
             // never blocked by the transient confirmation.
             Button {
+                ClipPeek.shared.hide(reason: "favorited")   // the card's star would go stale
                 store.toggleFavorite(item.id)
             } label: {
                 Image(systemName: item.isFavorite ? "star.fill" : "star")

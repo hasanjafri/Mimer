@@ -199,15 +199,21 @@ Typical loop: edit → `xcodebuild build` → relaunch the Debug app → drive v
   `ClipPeek` owns *when and where*: a 0.4s hover dwell (0.55s for keyboard selection, which anchors
   beside the palette instead of the pointer), warm swaps with no second wait, a 0.12s exit grace,
   and a **watchdog** that re-checks the reason to exist every 0.25s — AppKit does not reliably
-  deliver hover-exit when the pointer leaves a window, and a menu can vanish under the card.
+  deliver hover-exit when the pointer leaves a window, and a menu can vanish under the card. The
+  watchdog also **fails closed on a masking-preference change** (a card built while masking was
+  off must not stay on screen once it's on) and falls back to pointer drift when no host window
+  could be identified, so a missed hover-exit can never strand a card.
+  Timers run in **`.common`** run-loop modes: `Timer.scheduledTimer` registers `.default` only,
+  which stalls during event tracking — i.e. exactly while you scroll the clip list.
   It lives in its own `ClipPeekPanel`: borderless, non-activating, `canBecomeKey == false`,
   `ignoresMouseEvents` (so the row underneath stays hovered), one level above `.popUpMenu` so it
   clears the menu dropdown. `ClipPeekLayout.frame(...)` is pure: beside the host window, flipped
   when the right edge is full, always fully on screen.
 - `ClipSyntax` — **content-aware formatting inside the card**: format detection (diff · JSON ·
   code · URL), a small language-agnostic lexer (comments/strings/numbers/keywords/JSON keys),
-  diff line roles, URL host + tracking-parameter spans, and an order-preserving **JSON
-  re-indenter** (a whitespace-only pass over the same tokens — never a decode/re-encode, which
+  diff line roles, URL host + tracking-parameter spans (the tracking list is
+  `ClipTransform.trackingParameters` — **one list**, so the card can't flag what ⌘K would keep),
+  and an order-preserving **JSON re-indenter** (a whitespace-only pass over the same tokens — never a decode/re-encode, which
   would reorder keys; the card labels it `formatted`). Pure, offset-based spans → trivially
   testable. It is a lexer, not a parser: it never rewrites a clip.
 - `Onboarding*`, `Settings*` (General / Privacy / Developer / About — General has a

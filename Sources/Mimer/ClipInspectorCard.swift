@@ -7,7 +7,6 @@ import AppKit
 /// is layout only. Hosted by `ClipPeek` in a click-through panel beside the palette or menu.
 struct ClipInspectorCard: View {
     let inspector: ClipInspector
-    var query: String = ""
 
     static let width: CGFloat = 380
 
@@ -100,7 +99,7 @@ struct ClipInspectorCard: View {
         VStack(alignment: .leading, spacing: 10) {
             body(preview.head, monospaced: preview.monospaced)
             if preview.isElided {
-                elisionMarker(preview.elided)
+                elisionMarker(preview.elided, hiddenMatches: preview.hiddenMatches)
                 body(preview.tail, monospaced: preview.monospaced)
             }
         }
@@ -120,10 +119,12 @@ struct ClipInspectorCard: View {
 
     /// The elided middle, called out rather than hidden — you should always know how much of
     /// the clip you are not looking at.
-    private func elisionMarker(_ count: Int) -> some View {
+    private func elisionMarker(_ count: Int, hiddenMatches: Int) -> some View {
         HStack(spacing: 8) {
             rule
-            Text("\(count.formatted()) more characters")
+            Text(hiddenMatches > 0
+                 ? "\(count.formatted()) more characters · \(hiddenMatches) match\(hiddenMatches == 1 ? "" : "es") hidden"
+                 : "\(count.formatted()) more characters")
                 .font(.caption2.monospacedDigit())
                 .foregroundStyle(.tertiary)
                 .fixedSize()
@@ -170,7 +171,7 @@ struct ClipInspectorCard: View {
     /// part a truncated row can never show.
     private func highlighted(_ text: String) -> AttributedString {
         let spans = ClipSyntax.spans(for: text, format: inspector.format)
-        let hits = ClipInspector.highlightRanges(in: text, query: query)
+        let hits = ClipInspector.highlightRanges(in: text, query: inspector.query)
         guard !spans.isEmpty || !hits.isEmpty else { return AttributedString(text) }
 
         var styles = [ClipSyntax.Style](repeating: .plain, count: text.count)
@@ -336,8 +337,7 @@ private struct ImagePeek: View {
         .padding(14)
         .task(id: hash) {
             guard let hash else { return }
-            image = await ThumbnailCache.shared.thumbnail(for: hash, maxPixel: 640)
-            info = await ThumbnailCache.shared.info(for: hash)
+            (image, info) = await ThumbnailCache.shared.preview(for: hash, maxPixel: 640)
         }
     }
 }

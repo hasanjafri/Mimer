@@ -166,11 +166,62 @@ final class ClipInspectorBadgeTests: XCTestCase {
     }
 
     func testASecretIsNeverSyntaxHighlightedIntoTheOpen() {
-        let item = ClipItem(id: UUID(), text: #"{"aws_secret_access_key":"wJalrXUtnFEMI/K7MDENG/bPxRfiCY"}"#,
+        let item = ClipItem(id: UUID(), text: "AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCY",
                             kind: .text, createdAt: Date(), isFavorite: false)
         let inspector = ClipInspector.make(for: item, maskSecrets: true)
-        if case .masked = inspector.content {
-            XCTAssertEqual(inspector.format, .plain, "masked content is never lexed")
+        guard case .masked(let shown) = inspector.content else {
+            return XCTFail("a detected secret must render masked, whatever its content shape")
         }
+        XCTAssertFalse(shown.contains("wJalrXUtnFEMI"))
+        XCTAssertEqual(inspector.format, .plain, "masked content is never lexed")
+    }
+
+    func testOneSidedHunksAreStillDiffs() {
+        XCTAssertTrue(ClipSyntax.looksLikeDiff("@@ -1,0 +1,2 @@\n+added\n+more"), "add-only patch")
+        XCTAssertTrue(ClipSyntax.looksLikeDiff("@@ -1,2 +1,0 @@\n-gone\n-also gone"), "delete-only patch")
+        XCTAssertFalse(ClipSyntax.looksLikeDiff("@@ nothing @@\n context only"))
+    }
+
+    func testFileHeadersAloneAreNotAChange() {
+        // +++/--- are headers, not added/removed lines: they must not fake a diff on their own.
+        XCTAssertFalse(ClipSyntax.looksLikeDiff("@@ -1 +1 @@\n+++ b/x\n--- a/x"))
+    }
+
+    func testFragmentsAreNotTracking() {
+        let url = "https://example.com/docs?utm_source=news#installation"
+        let found = ClipSyntax.spans(for: url, format: .url).map {
+            (String(Array(url)[$0.range]), $0.style)
+        }
+        XCTAssertTrue(found.contains { $0 == ("utm_source=news", .tracking) })
+        XCTAssertFalse(found.contains { $0.0.contains("#installation") },
+                       "a fragment is neither query nor tracking noise")
+    }
+
+    func testTheElidedTailOfALongURLStillLexes() {
+        // What the card actually renders for the tail of an elided URL: no scheme, no '?'.
+        let tail = "utm_campaign=launch&plan=pro&fbclid=abc"
+        let found = ClipSyntax.spans(for: tail, format: .url).map {
+            (String(Array(tail)[$0.range]), $0.style)
+        }
+        XCTAssertFalse(found.contains { $0.1 == .host }, "a query fragment is not a host")
+        XCTAssertTrue(found.contains { $0 == ("utm_campaign=launch", .tracking) })
+        XCTAssertTrue(found.contains { $0 == ("fbclid=abc", .tracking) })
+    }
+
+    func testHostDetectionRejectsQueryLikeText() {
+        XCTAssertTrue(ClipSyntax.looksLikeHost("sub.example.co.uk:8080"))
+        XCTAssertFalse(ClipSyntax.looksLikeHost("utm_campaign=launch&plan=pro"))
+        XCTAssertFalse(ClipSyntax.looksLikeHost("nodots"))
+    }
+
+    func testTrackingListIsSharedWithTheStripTransform() {
+        // The badge counts what ⌘K would strip — one list, or the card lies.
+        for name in ["gbraid", "wbraid", "utm_term", "fbclid"] {
+            XCTAssertTrue(ClipSyntax.isTrackingParameter(name), name)
+            XCTAssertTrue(ClipTransform.isTrackingParameter(name), name)
+        }
+        let url = "https://x.com/a?gbraid=1&wbraid=2&keep=3"
+        XCTAssertEqual(ClipInspector.trackingParameterCount(in: url), 2)
+        XCTAssertEqual(ClipTransform.all.first { $0.id == "urlstrip" }?.apply(url), "https://x.com/a?keep=3")
     }
 }

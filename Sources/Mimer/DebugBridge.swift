@@ -139,8 +139,8 @@ final class DebugBridge {
                             width: ClipInspectorCard.width), "render-peek.png")
         }
         write(renderPNG(ClipInspectorCard(inspector: ClipInspector.make(for: Self.longSampleClip,
-                                                                       maskSecrets: true),
-                                          query: "shipping"),
+                                                                       maskSecrets: true,
+                                                                       query: "shipping")),
                         width: ClipInspectorCard.width), "render-peek-long.png")
         // One sheet of every content treatment, for design review of the card.
         write(renderPNG(

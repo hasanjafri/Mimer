@@ -39,15 +39,25 @@ final class ThumbnailCache {
         return image
     }
 
-    /// Dimensions / encoding / size of the stored blob, read from the image headers only.
-    func info(for hash: String) async -> ImageBlobInfo? {
-        if let cached = infos[hash] { return cached }
-        guard let data = ClipStore.shared.blobData(hash) else { return nil }
-        let info = await Task.detached(priority: .userInitiated, operation: {
-            Self.readInfo(data)
+    /// The preview card's image **and** its metadata from a single load: reading the blob twice
+    /// would decrypt and re-read every byte of a large image for the sake of a size label.
+    func preview(for hash: String, maxPixel: CGFloat) async -> (image: NSImage?, info: ImageBlobInfo?) {
+        let key = "\(hash)@\(Int(maxPixel))" as NSString
+        if let image = cache.object(forKey: key), let info = infos[hash] { return (image, info) }
+        guard let data = ClipStore.shared.blobData(hash) else { return (nil, nil) }
+
+        let decoded = await Task.detached(priority: .userInitiated, operation: {
+            (Self.downsample(data, maxPixel: maxPixel), Self.readInfo(data))
         }).value
-        infos[hash] = info
-        return info
+
+        var image: NSImage?
+        if let cg = decoded.0 {
+            image = NSImage(cgImage: cg, size: NSSize(width: cg.width, height: cg.height))
+            cache.setObject(image!, forKey: key, cost: cg.width * cg.height * 4)
+        }
+        if infos.count >= 512 { infos.removeAll() }   // tiny records, but never unbounded
+        infos[hash] = decoded.1
+        return (image, decoded.1)
     }
 
     private nonisolated static func readInfo(_ data: Data) -> ImageBlobInfo {

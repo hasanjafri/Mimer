@@ -20,6 +20,14 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Search terms are highlighted inside the preview — including in the middle of a long clip.
 - Masked secrets stay masked in the preview; images preview large with their dimensions,
   encoding, and file size.
+- When a search term matches only in a long clip's elided middle, the card says so
+  (`2,599 more characters · 30 matches hidden`) instead of showing a preview with no
+  visible reason for being in the results.
+
+### Changed
+- **Strip tracking params** (⌘K) also removes `twclid`, `wickedid`, and `s_kwcid`. The
+  preview card's tracking highlighting and this transform now share one list, so the card
+  can't flag something ⌘K would keep.
 
 ## [0.3.0] - 2026-07-27
 

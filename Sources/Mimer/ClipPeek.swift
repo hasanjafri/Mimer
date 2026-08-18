@@ -34,6 +34,8 @@ final class ClipPeek {
     private var pending: (id: UUID, card: ClipInspectorCard, anchor: Anchor)?
     private var shownID: UUID?
     private var anchoredToPointer = false
+    private var anchorPoint: NSPoint = .zero
+    private var maskedWhenShown = true
     private var exitGrace: Timer?
 
     var isVisible: Bool { panel?.isVisible ?? false }
@@ -66,6 +68,7 @@ final class ClipPeek {
     /// The pointer left `id`'s row. Ignored if a different row has since taken over, so moving
     /// between rows never flickers.
     func endHover(_ id: UUID) {
+        guard anchoredToPointer else { return }   // a keyboard-anchored card isn't the pointer's to dismiss
         guard pending?.id == id || shownID == id else { return }
         // Leave on a short grace: moving between two rows fires exit-then-enter, and AppKit can
         // emit a spurious exit mid-row. A real departure still reads as instant.
@@ -79,9 +82,8 @@ final class ClipPeek {
     /// or a window that has to keep focus. Never reachable in a release build.
     func debugPeek(_ item: ClipItem, action: ClipAction? = nil) {
         let palette = PaletteController.shared.panelWindow
-        let center = NSScreen.main.map { NSPoint(x: $0.frame.midX, y: $0.frame.midY) } ?? .zero
         show(item, query: "", action: action, revealed: false, host: palette,
-             anchor: palette == nil ? .pointer(center) : .hostCenter, delay: Self.keyboardDelay)
+             anchor: .hostCenter, delay: Self.keyboardDelay)   // never pointer-anchored: no live mouse here
     }
     #endif
 
@@ -100,18 +102,21 @@ final class ClipPeek {
     private func show(_ item: ClipItem, query: String, action: ClipAction?, revealed: Bool,
                       host: NSWindow?, anchor: Anchor, delay: TimeInterval) {
         guard Preferences.shared.previewOnHover else { return }
+        exitGrace?.invalidate(); exitGrace = nil   // before the early return: re-entering the same row cancels its pending exit
         guard shownID != item.id || !isVisible else { return }   // already showing this clip
 
         let inspector = ClipInspector.make(for: item,
                                            maskSecrets: Preferences.shared.maskSecrets,
                                            revealed: revealed,
-                                           action: action)
+                                           action: action,
+                                           query: query)
         log("show \(anchor.isPointer ? "hover" : "keyboard")")
         self.host = host
         anchoredToPointer = anchor.isPointer
-        pending = (item.id, ClipInspectorCard(inspector: inspector, query: query), anchor)
+        maskedWhenShown = Preferences.shared.maskSecrets
+        if case .pointer(let point) = anchor { anchorPoint = point }
+        pending = (item.id, ClipInspectorCard(inspector: inspector), anchor)
 
-        exitGrace?.invalidate(); exitGrace = nil
         dwell?.invalidate()
         if isVisible {
             present()          // warm: swap content with no second wait
@@ -171,7 +176,19 @@ final class ClipPeek {
     private func checkStillValid() {
         guard isVisible else { watchdog?.invalidate(); watchdog = nil; return }
         guard Preferences.shared.previewOnHover else { hide(reason: "pref-off"); return }
-        guard let host else { return }   // no host to watch (unknown surface) — hover-exit still ends it
+        // Fail closed on a masking change: the card on screen was rendered under the old setting,
+        // and if masking was just switched on it is showing a secret it no longer should.
+        guard Preferences.shared.maskSecrets == maskedWhenShown else { hide(reason: "masking-changed"); return }
+
+        guard let host else {
+            // No host window to watch (the pointer was over something we couldn't identify).
+            // Fall back to the pointer itself, so a missed hover-exit can't strand the card.
+            if anchoredToPointer, hypot(NSEvent.mouseLocation.x - anchorPoint.x,
+                                        NSEvent.mouseLocation.y - anchorPoint.y) > 60 {
+                hide(reason: "pointer-moved")
+            }
+            return
+        }
         guard host.isVisible else { hide(reason: "host-gone"); return }
         // A pointer-anchored card belongs to the pointer: once it leaves the window the card is
         // stale, even if the row never delivered its exit. Keyboard-anchored cards ignore this.

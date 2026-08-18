@@ -186,6 +186,37 @@ final class ClipInspectorTests: XCTestCase {
         XCTAssertEqual(ClipInspector.relativeLabel(Date(), now: Date()), "just now")
     }
 
+    /// A clip stamped in the future (clock skew, a restored database) is not "just now".
+    func testFutureTimestampsAreNotJustNow() {
+        let now = Date()
+        XCTAssertNotEqual(ClipInspector.relativeLabel(now.addingTimeInterval(30), now: now), "just now")
+    }
+
+    /// A clip can match your search entirely inside the part the card elides — say so rather
+    /// than showing a preview with no visible reason for being in the results.
+    func testMatchesHiddenInTheElidedMiddleAreCounted() {
+        let text = String(repeating: "a", count: 600) + " needle needle " + String(repeating: "b", count: 600)
+        let item = clip(text)
+        guard case .text(let preview) = ClipInspector.make(for: item, maskSecrets: true,
+                                                           query: "needle").content else {
+            return XCTFail("expected a text preview")
+        }
+        XCTAssertTrue(preview.isElided)
+        XCTAssertEqual(preview.hiddenMatches, 2)
+        XCTAssertFalse(preview.head.contains("needle"))
+        XCTAssertFalse(preview.tail.contains("needle"))
+    }
+
+    func testVisibleMatchesAreNotCountedAsHidden() {
+        let item = clip("needle " + String(repeating: "a", count: 2000))
+        guard case .text(let preview) = ClipInspector.make(for: item, maskSecrets: true,
+                                                           query: "needle").content else {
+            return XCTFail("expected a text preview")
+        }
+        XCTAssertTrue(preview.head.hasPrefix("needle"))
+        XCTAssertEqual(preview.hiddenMatches, 0)
+    }
+
     func testProvenanceAndFavoriteCarryThrough() {
         let item = clip("hi", favorite: true, app: "Safari")
         let inspector = ClipInspector.make(for: item, maskSecrets: true)

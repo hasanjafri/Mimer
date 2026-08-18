@@ -20,6 +20,8 @@ struct ClipInspector: Equatable, Sendable {
     var absoluteTime: String
     var actionHint: String?
     var isFavorite: Bool
+    /// The palette's search text, highlighted in the body by the card.
+    var query: String = ""
 
     enum Content: Equatable, Sendable {
         case text(Preview)
@@ -34,6 +36,9 @@ struct ClipInspector: Equatable, Sendable {
         var tail: String
         var elided: Int              // characters hidden between head and tail (0 = the whole clip)
         var monospaced: Bool
+        /// Search matches that fall inside the elided middle. Without this a clip could match
+        /// your search entirely in the part the card doesn't show, with nothing to say so.
+        var hiddenMatches: Int = 0
         var isElided: Bool { elided > 0 }
     }
 
@@ -57,6 +62,7 @@ struct ClipInspector: Equatable, Sendable {
                      maskSecrets: Bool,
                      revealed: Bool = false,
                      action: ClipAction? = nil,
+                     query: String = "",
                      now: Date = Date()) -> ClipInspector {
         let secretKind = SecretDetector.kind(of: item.text)
         let kind = effectiveKind(of: item)
@@ -82,10 +88,12 @@ struct ClipInspector: Equatable, Sendable {
                 format = .json(reindented: true)
             }
             let structured = format != .plain
-            content = .text(preview(body,
-                                    monospaced: structured || prefersMonospace(kind, text: item.text),
-                                    charBudget: structured ? structuredCharBudget : charBudget,
-                                    lineBudget: structured ? structuredLineBudget : lineBudget))
+            var text = preview(body,
+                               monospaced: structured || prefersMonospace(kind, text: item.text),
+                               charBudget: structured ? structuredCharBudget : charBudget,
+                               lineBudget: structured ? structuredLineBudget : lineBudget)
+            text.hiddenMatches = hiddenMatchCount(in: body, preview: text, query: query)
+            content = .text(text)
         }
 
         return ClipInspector(
@@ -99,8 +107,19 @@ struct ClipInspector: Equatable, Sendable {
             relativeTime: relativeLabel(item.createdAt, now: now),
             absoluteTime: absoluteLabel(item.createdAt, now: now),
             actionHint: action.map(\.label),
-            isFavorite: item.isFavorite
+            isFavorite: item.isFavorite,
+            query: query
         )
+    }
+
+    /// How many search matches are in the part of the clip the card doesn't show — the head is a
+    /// prefix and the tail a suffix of the displayed text, so the middle is what's left.
+    static func hiddenMatchCount(in body: String, preview: Preview, query: String) -> Int {
+        guard preview.isElided, !query.isEmpty else { return 0 }
+        let display = displayText(body)
+        guard display.count > preview.head.count + preview.tail.count else { return 0 }
+        let middle = display.dropFirst(preview.head.count).dropLast(preview.tail.count)
+        return highlightRanges(in: String(middle), query: query).count
     }
 
     // MARK: - Kind
@@ -268,7 +287,7 @@ struct ClipInspector: Equatable, Sendable {
 
     static func relativeLabel(_ date: Date, now: Date = Date()) -> String {
         let delta = now.timeIntervalSince(date)
-        if delta < 60 { return "just now" }
+        if delta >= 0, delta < 60 { return "just now" }   // a future stamp (clock skew) reads as a real date
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .full
         return formatter.localizedString(for: date, relativeTo: now)

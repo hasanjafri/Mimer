@@ -450,6 +450,7 @@ struct PaletteView: View {
     private func toggleFavoriteSelected() {
         guard results.indices.contains(selection) else { return }
         let id = results[selection].id
+        ClipPeek.shared.hide(reason: "favorited")   // the card's star would go stale
         store.toggleFavorite(id)
         if let newIndex = results.firstIndex(where: { $0.id == id }) {
             selection = newIndex   // favoriting reorders the list — follow the clip so the next action hits it

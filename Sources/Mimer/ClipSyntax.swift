@@ -46,7 +46,9 @@ enum ClipSyntax {
         guard lines.count >= 2 else { return false }
         if lines[0].hasPrefix("diff --git ") { return true }
         let hunk = lines.contains { $0.hasPrefix("@@") && $0.dropFirst(2).contains("@@") }
-        let changes = lines.contains { $0.hasPrefix("+") } && lines.contains { $0.hasPrefix("-") }
+        // Either marker is enough: plenty of real hunks only add, or only delete.
+        let changes = lines.contains { $0.hasPrefix("+") && !$0.hasPrefix("+++") }
+            || lines.contains { $0.hasPrefix("-") && !$0.hasPrefix("---") }
         return hunk && changes
     }
 
@@ -128,47 +130,69 @@ enum ClipSyntax {
     }
 
     /// Scheme dimmed, host emphasised, and tracking parameters called out — the parts that
-    /// actually distinguish two long URLs from each other.
+    /// actually distinguish two long URLs from each other. Runs on each previewed segment
+    /// independently, so it also has to cope with the *tail* of an elided URL: a bare
+    /// `…&utm_campaign=launch&plan=pro` slice with no scheme and no `?` of its own.
     private static func urlSpans(_ text: String) -> [Span] {
-        let characters = Array(text)
+        let c = Array(text)
         var spans: [Span] = []
-
         var cursor = 0
-        if let schemeEnd = indexOf("://", in: characters, from: 0) {
+        var sawScheme = false
+
+        if let schemeEnd = indexOf("://", in: c, from: 0) {
             spans.append(Span(range: 0..<(schemeEnd + 3), style: .meta))
             cursor = schemeEnd + 3
+            sawScheme = true
         }
-        let hostEnd = [indexOf("/", in: characters, from: cursor),
-                       indexOf("?", in: characters, from: cursor),
-                       indexOf("#", in: characters, from: cursor)]
-            .compactMap { $0 }.min() ?? characters.count
-        if hostEnd > cursor { spans.append(Span(range: cursor..<hostEnd, style: .host)) }
 
-        guard let queryStart = indexOf("?", in: characters, from: hostEnd) else { return spans }
-        spans.append(Span(range: queryStart..<characters.count, style: .meta))
+        // A fragment is not part of the query, and never tracking.
+        let end = indexOf("#", in: c, from: cursor) ?? c.count
+        let question = indexOf("?", in: c, from: cursor).flatMap { $0 < end ? $0 : nil }
 
-        // Each tracking parameter on top of the dimmed query, so it reads as removable noise.
-        var paramStart = queryStart + 1
-        while paramStart < characters.count {
-            let end = indexOf("&", in: characters, from: paramStart) ?? characters.count
-            let name = String(characters[paramStart..<min(end, characters.count)])
-                .split(separator: "=", maxSplits: 1).first.map(String.init) ?? ""
-            if isTrackingParameter(name) {
-                spans.append(Span(range: paramStart..<end, style: .tracking))
+        var foundHost = false
+        let hostEnd = [indexOf("/", in: c, from: cursor), question, end].compactMap { $0 }.min() ?? c.count
+        if hostEnd > cursor {
+            let candidate = String(c[cursor..<hostEnd])
+            if sawScheme || looksLikeHost(candidate) {
+                spans.append(Span(range: cursor..<hostEnd, style: .host))
+                foundHost = true
             }
-            paramStart = end + 1
+        }
+
+        let paramsStart: Int
+        if let question {
+            paramsStart = question + 1
+        } else if !foundHost, looksLikeQuery(String(c[cursor..<end])) {
+            paramsStart = cursor                     // the previewed tail of a long URL
+        } else {
+            return spans
+        }
+        guard paramsStart < end else { return spans }
+
+        spans.append(Span(range: paramsStart..<end, style: .meta))
+        var start = paramsStart
+        while start < end {
+            let next = indexOf("&", in: c, from: start).flatMap { $0 < end ? $0 : nil } ?? end
+            let name = String(c[start..<next]).split(separator: "=", maxSplits: 1).first.map(String.init) ?? ""
+            if isTrackingParameter(name) { spans.append(Span(range: start..<next, style: .tracking)) }
+            start = next + 1
         }
         return spans
     }
 
-    static let trackingParameters: Set<String> = [
-        "fbclid", "gclid", "dclid", "msclkid", "mc_cid", "mc_eid", "igshid", "twclid",
-        "yclid", "_hsenc", "_hsmi", "vero_id", "wickedid", "ref_src", "s_kwcid"
-    ]
+    /// `example.com`, `sub.example.co.uk:8080` — but not `utm_campaign=launch&plan=pro`, which is
+    /// what a previewed URL tail looks like.
+    static func looksLikeHost(_ s: String) -> Bool {
+        guard s.contains("."), !s.contains("="), !s.contains("&") else { return false }
+        return s.allSatisfy { $0.isLetter || $0.isNumber || "-._:".contains($0) }
+    }
 
+    static func looksLikeQuery(_ s: String) -> Bool { s.contains("=") && !s.contains(where: \.isWhitespace) }
+
+    /// One source of truth with the ⌘K "Strip tracking params" transform — the card must not flag
+    /// something the transform would keep, or vice versa.
     static func isTrackingParameter(_ name: String) -> Bool {
-        let lower = name.lowercased()
-        return lower.hasPrefix("utm_") || trackingParameters.contains(lower)
+        ClipTransform.isTrackingParameter(name)
     }
 
     /// A small, language-agnostic lexer: comments, strings, numbers, keywords, and JSON keys.
