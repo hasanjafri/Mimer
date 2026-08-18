@@ -113,7 +113,12 @@ final class ClipboardMonitor {
 
         // Prefer text — unless it's just a single-line URL accompanying an image (e.g. "copy
         // image" in a browser), where the image is what the user wants.
-        if let trimmed, !trimmed.isEmpty, !(hasImage && !trimmed.contains("\n") && ClipKind.detect(from: trimmed) == .link) {
+        // Text over the cap is skipped, not truncated: a partial clip would paste as silently
+        // corrupted content. The system clipboard still holds it, so ⌘V works — it just doesn't
+        // enter history, where it would be encrypted on this thread and then held decrypted in
+        // memory for the rest of the session. Same reasoning as `maxImageBytes`.
+        if let trimmed, !trimmed.isEmpty, text!.utf8.count <= Self.maxTextBytes,
+           !(hasImage && !trimmed.contains("\n") && ClipKind.detect(from: trimmed) == .link) {
             onCapture(text!)
             return true
         }
@@ -124,6 +129,10 @@ final class ClipboardMonitor {
     }
 
     private static let maxImageBytes = 32 * 1024 * 1024   // skip absurdly large images (would block the poll)
+    /// Skip absurdly large text. Encryption happens on this thread and the plaintext then lives in
+    /// `ClipStore.items` for the session, so an unbounded clip is both a stall and a permanent
+    /// resident. 8 MB is far past any deliberate copy (~2 million words).
+    static let maxTextBytes = 8 * 1024 * 1024
 
     /// Image bytes for the blob: prefer PNG; convert TIFF → PNG; if conversion fails, keep the
     /// raw TIFF (don't silently drop). nil if absent or over the size cap.

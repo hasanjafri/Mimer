@@ -6,6 +6,13 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+- Text clips larger than **8 MB** are no longer recorded, mirroring the existing 32 MB image
+  cap. They're skipped rather than truncated (a partial clip would paste as silently corrupted
+  content) and the system clipboard still holds the original, so ⌘V works — it just doesn't
+  enter history, where it would be encrypted on the polling thread and then held decrypted in
+  memory for the rest of the session.
+
 ### Added
 - **Hover preview card** — pause on a clip in the menu or the palette and the full clip appears
   in a card beside the list. Long clips keep their start **and** their end (the middle is

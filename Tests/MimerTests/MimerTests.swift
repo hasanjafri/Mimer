@@ -33,6 +33,38 @@ final class ClipboardMonitorTests: XCTestCase {
         XCTAssertTrue(texts.isEmpty)
     }
 
+    /// A clip larger than the cap is skipped rather than truncated — truncation would paste
+    /// silently corrupted content, and the system clipboard still has the real thing.
+    func testSkipsTextOverTheSizeCap() {
+        let (monitor, pb, captured) = makeMonitor()
+        pb.clearContents()
+        pb.setString(String(repeating: "a", count: ClipboardMonitor.maxTextBytes + 1), forType: .string)
+        XCTAssertFalse(monitor.captureIfChanged())
+        XCTAssertTrue(captured().isEmpty)
+    }
+
+    func testCapturesTextAtTheSizeCap() {
+        let (monitor, pb, captured) = makeMonitor()
+        pb.clearContents()
+        pb.setString(String(repeating: "a", count: ClipboardMonitor.maxTextBytes), forType: .string)
+        XCTAssertTrue(monitor.captureIfChanged())
+        XCTAssertEqual(captured().count, 1)
+    }
+
+    /// An oversized text clip must not shadow an image on the same pasteboard.
+    func testOversizedTextFallsThroughToTheImage() {
+        let pb = NSPasteboard(name: NSPasteboard.Name("MimerTestCap-\(UUID().uuidString)"))
+        pb.clearContents()
+        var texts: [String] = []; var images: [Data] = []
+        let m = ClipboardMonitor(pasteboard: pb, onCapture: { texts.append($0) }, onCaptureImage: { images.append($0) })
+        pb.declareTypes([.string, .png], owner: nil)
+        pb.setString(String(repeating: "b", count: ClipboardMonitor.maxTextBytes + 1), forType: .string)
+        pb.setData(pngData(), forType: .png)
+        XCTAssertTrue(m.captureIfChanged())
+        XCTAssertTrue(texts.isEmpty)
+        XCTAssertEqual(images.count, 1)
+    }
+
     func testPrefersTextOverImage() {
         let pb = NSPasteboard(name: NSPasteboard.Name("MimerTestImg-\(UUID().uuidString)"))
         pb.clearContents()
