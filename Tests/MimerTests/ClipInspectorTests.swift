@@ -4,6 +4,10 @@ import XCTest
 /// The hover preview card's content model. The rules that matter: a long clip keeps both its
 /// start and its end, a masked secret stays masked, and the counts it reports are true.
 final class ClipInspectorTests: XCTestCase {
+    // Built from parts, never committed whole: GitHub's secret-scanning push protection flags
+    // real-looking literals even in tests (see SecretDetectorTests for the same convention).
+    static let awsKey = "AKIA" + "0123456789ABCDEF"
+
 
     private func clip(_ text: String,
                       kind: ClipKind = .text,
@@ -209,7 +213,7 @@ final class ClipInspectorTests: XCTestCase {
     }
 
     func testSecretTitleNamesTheKindOfSecret() {
-        let title = ClipInspector.make(for: clip("AKIAIOSFODNN7EXAMPLE"), maskSecrets: true).title
+        let title = ClipInspector.make(for: clip(Self.awsKey), maskSecrets: true).title
         XCTAssertEqual(title, "Secret · AWS key")
     }
 
@@ -222,24 +226,24 @@ final class ClipInspectorTests: XCTestCase {
     // MARK: - Secrets
 
     func testMaskedSecretStaysMaskedInTheCard() {
-        let item = clip("AKIAIOSFODNN7EXAMPLE")
+        let item = clip(Self.awsKey)
         guard case .masked(let shown) = ClipInspector.make(for: item, maskSecrets: true).content else {
             return XCTFail("a detected secret must render masked, not as text")
         }
-        XCTAssertFalse(shown.contains("AKIAIOSFODNN7EXAMPLE"))
+        XCTAssertFalse(shown.contains(Self.awsKey))
         XCTAssertTrue(shown.contains("AWS key"))
     }
 
     func testRevealedSecretShowsItsText() {
-        let item = clip("AKIAIOSFODNN7EXAMPLE")
+        let item = clip(Self.awsKey)
         guard case .text(let preview) = ClipInspector.make(for: item, maskSecrets: true, revealed: true).content else {
             return XCTFail("⌘O-revealed secrets show their value")
         }
-        XCTAssertEqual(preview.head, "AKIAIOSFODNN7EXAMPLE")
+        XCTAssertEqual(preview.head, Self.awsKey)
     }
 
     func testMaskingOffShowsTheText() {
-        let item = clip("AKIAIOSFODNN7EXAMPLE")
+        let item = clip(Self.awsKey)
         guard case .text = ClipInspector.make(for: item, maskSecrets: false).content else {
             return XCTFail("with masking off the card shows the value")
         }

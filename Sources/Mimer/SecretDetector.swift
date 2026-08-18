@@ -22,7 +22,11 @@ enum SecretDetector {
     /// The slice examined for secret shapes: the whole clip when it's a normal size, its opening
     /// otherwise. Cheap to decide — `utf8.count` is O(1), unlike `count`.
     private static func scanWindow(_ text: String) -> String {
-        text.utf8.count > scanLimit ? String(text.prefix(scanLimit)) : text
+        guard text.utf8.count > scanLimit else { return text }
+        // Sliced by bytes, not characters: `prefix(scanLimit)` counts characters, so a clip of
+        // multibyte text would scan up to four times the window this documents. A partial
+        // character at the cut decodes to U+FFFD, which no rule below can match anyway.
+        return String(decoding: text.utf8.prefix(scanLimit), as: UTF8.self)
     }
 
     /// A short human label for the detected secret kind (used in the masked display), or nil.
