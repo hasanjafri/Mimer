@@ -136,6 +136,23 @@ final class ClipInspectorTests: XCTestCase {
                       "lexed alone it swallows the rest — the bug this closes")
     }
 
+    /// The ambiguous case a fragment can't resolve alone: a tail beginning with a *removed line*
+    /// whose own text started with `-- `, which serialises to `--- …` and looks like a file
+    /// header. Lexed with its preceding context, the hunk state is already known.
+    func testARemovedLineThatLooksLikeAHeaderStaysARemovedLine() {
+        let patch = "diff --git a/x b/x\n--- a/x\n+++ b/x\n@@ -1,40 +1,40 @@\n"
+            + String(repeating: " context line\n", count: 60)
+            + "--- a/x was removed here\n+++ b/x was added here"
+        let display = ClipInspector.displayText(patch)
+        // Slice at the ambiguous line rather than counting characters to it.
+        let tail = String(display[display.range(of: "--- a/x was removed")!.lowerBound...])
+
+        let styles = ClipInspector.tailSpans(display, tail: tail, format: .diff)
+        XCTAssertEqual(styles.first?.style, .removed,
+                       "context says we are inside a hunk, so this is content — not a header")
+        XCTAssertTrue(styles.contains { $0.style == .added })
+    }
+
     func testTailSpansAreEmptyWithoutATail() {
         XCTAssertTrue(ClipInspector.tailSpans("whole clip"[...], tail: "", format: .code).isEmpty)
     }
