@@ -21,6 +21,7 @@ struct PaletteView: View {
     @ObservedObject private var prefs = Preferences.shared
     @State private var query = ""
     @State private var selection = 0
+    @State private var hoveredID: UUID?
     @FocusState private var searchFocused: Bool
     @State private var needsPasteGrant = !Paster.canPostEvents
 
@@ -99,10 +100,14 @@ struct PaletteView: View {
         }
         .onChange(of: query) {
             parsedQuery = SearchQuery.parse(query)
+            ClipPeek.shared.hide(reason: "query")   // the list is re-ordering under the pointer — don't describe a stale row
             if transformTarget != nil { transformSelection = 0 } else { selection = 0 }
         }
         .onChange(of: results.count) { if selection >= results.count { selection = max(0, results.count - 1) } }
-        .onChange(of: transformTarget?.id) { DispatchQueue.main.async { searchFocused = true } }   // keep keys alive across modes
+        .onChange(of: transformTarget?.id) {
+            ClipPeek.shared.hide(reason: "transform-mode")   // transform mode lists transforms, not clips
+            DispatchQueue.main.async { searchFocused = true }
+        }
         .onKeyPress(.downArrow) { moveSelection(1); return .handled }
         .onKeyPress(.upArrow) { moveSelection(-1); return .handled }
         .onKeyPress(.escape) { escapeAction(); return .handled }
@@ -179,10 +184,20 @@ struct PaletteView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
         .background(
-            index == selection ? Color.accentColor.opacity(0.25) : .clear,
+            index == selection ? Color.accentColor.opacity(0.25)
+                               : (hoveredID == item.id ? Color.primary.opacity(0.06) : .clear),
             in: RoundedRectangle(cornerRadius: 6)
         )
         .contentShape(Rectangle())
+        .onHover { hovering in
+            if hovering {
+                hoveredID = item.id
+                peek(item, keyboard: false)
+            } else if hoveredID == item.id {
+                hoveredID = nil
+                ClipPeek.shared.endHover(item.id)
+            }
+        }
         .onTapGesture { selection = index; pasteSelected() }
     }
 
@@ -319,6 +334,20 @@ struct PaletteView: View {
         } else {
             guard !results.isEmpty else { return }
             selection = (selection + delta + results.count) % results.count
+            peek(results[selection], keyboard: true)
+        }
+    }
+
+    /// Ask for the hover card for `item`. `keyboard` anchors it beside the palette (the pointer
+    /// is nowhere near the list) and waits a little longer, so arrowing through results never
+    /// flashes cards — it only appears once you stop on one.
+    private func peek(_ item: ClipItem, keyboard: Bool) {
+        let action = ClipAction.of(item.text, config: prefs.devConfig)
+        let revealed = revealedSecrets.contains(item.id)
+        if keyboard {
+            ClipPeek.shared.select(item, query: parsedQuery.text, action: action, revealed: revealed)
+        } else {
+            ClipPeek.shared.hover(item, query: parsedQuery.text, action: action, revealed: revealed)
         }
     }
 
@@ -431,6 +460,7 @@ struct PaletteView: View {
         guard results.indices.contains(selection) else { return }
         let id = results[selection].id
         stack.remove(id)        // keep the stack count/badges accurate
+        ClipPeek.shared.hide(reason: "deleted")  // the clip it describes is about to stop existing
         store.delete(id)
     }
 
@@ -448,6 +478,7 @@ struct PaletteView: View {
         case .revealSecret:
             if revealedSecrets.contains(item.id) { revealedSecrets.remove(item.id) }
             else { revealedSecrets.insert(item.id) }
+            ClipPeek.shared.hide(reason: "revealed")   // re-drawn on the next hover with the new masking state
         case .open(let url, _):
             // Defense-in-depth: only ever open a known-safe scheme, even though every
             // ClipAction constructor already validates (http/https links, vscode/cursor editor).

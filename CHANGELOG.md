@@ -6,6 +6,21 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- **Hover preview card** — pause on a clip in the menu or the palette and the full clip appears
+  in a card beside the list. Long clips keep their start **and** their end (the middle is
+  elided, with the hidden character count shown), so near-identical clips are finally
+  distinguishable. The footer shows characters / words / lines, the source app and its icon,
+  when it was copied, and the ⌘O action. Arrowing through the palette shows the card too.
+  Toggle in **Settings → General**.
+- **Content-aware formatting inside the preview** — minified **JSON** is re-wrapped for reading
+  (a whitespace-only pass: key order and values are untouched, and the card says `formatted`),
+  **diffs** colour their `+`/`−`/`@@` lines and carry a `+12 −3` badge, **code** gets comments,
+  strings, numbers and keywords, and **URLs** highlight the host and flag tracking parameters.
+  Search terms are highlighted inside the preview — including in the middle of a long clip.
+- Masked secrets stay masked in the preview; images preview large with their dimensions,
+  encoding, and file size.
+
 ## [0.3.0] - 2026-07-27
 
 ### Added

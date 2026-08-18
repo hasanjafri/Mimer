@@ -85,7 +85,7 @@ struct MenuBarView: View {
         .frame(height: listHeight)
         // AppKit doesn't always deliver a row's hover-exit when the pointer leaves
         // the window, so clear here when the pointer leaves the list entirely.
-        .onHover { if !$0 { hoverID = nil } }
+        .onHover { if !$0 { hoverID = nil; ClipPeek.shared.hide(reason: "menu-list-exit") } }
     }
 
     #if DEBUG
@@ -163,11 +163,20 @@ struct MenuBarView: View {
         )
         .contentShape(Rectangle())
         .onHover { hovering in
-            if hovering { hoverID = item.id }
-            else if hoverID == item.id { hoverID = nil }
+            if hovering {
+                hoverID = item.id
+                // No ⌘O here (that's the palette) — the card is pure content + provenance.
+                ClipPeek.shared.hover(item)
+            } else if hoverID == item.id {
+                hoverID = nil
+                ClipPeek.shared.endHover(item.id)
+            }
         }
         .onTapGesture { copy(item) }
-        .help("Click to copy to the clipboard")
+        // One hint at a time: with the preview card on, a system tooltip would pop up over it
+        // saying much less. VoiceOver gets the hint either way.
+        .modifier(OptionalHelp(prefs.previewOnHover ? nil : "Click to copy to the clipboard"))
+        .accessibilityHint("Copies this clip to the clipboard")
     }
 
     /// Copy a clip and flash an inline "Copied" confirmation on its row — the
@@ -222,6 +231,18 @@ struct MenuBarView: View {
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 6)
+    }
+}
+
+/// `.help(_:)` only when there is something to say — SwiftUI has no optional form, and an
+/// empty tooltip string is not the same as no tooltip.
+private struct OptionalHelp: ViewModifier {
+    let text: String?
+
+    init(_ text: String?) { self.text = text }
+
+    func body(content: Content) -> some View {
+        if let text { content.help(text) } else { content }
     }
 }
 

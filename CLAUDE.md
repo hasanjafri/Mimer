@@ -18,7 +18,7 @@ them; change `project.yml` and re-run `xcodegen generate`.
 ```sh
 xcodegen generate
 xcodebuild -project Mimer.xcodeproj -scheme Mimer -configuration Debug \
-  -destination 'platform=macOS,arch=arm64' CODE_SIGNING_ALLOWED=NO test   # 130 tests
+  -destination 'platform=macOS,arch=arm64' CODE_SIGNING_ALLOWED=NO test   # 179 tests
 ```
 
 - Swift 6 toolchain, **Swift 5 language mode** (`SWIFT_VERSION 5.0`) with
@@ -42,9 +42,15 @@ Release — never let it ship). When running a Debug build it watches
 - **Inject** a clip: `printf 'text' | pbcopy`
 - **Drive**: write a command to `_debug_cmd` — `open`, `close`, `paste <i>`, `fav <i>`,
   `delete <i>`, `pause` / `resume`, `transform <i>`, `snippet <text>`, `settings`,
-  `composer`, `snapshot`, `requestpaste` (trigger the macOS PostEvent prompt for auto-paste E2E).
+  `composer`, `snapshot`, `peek <i>` (hover card for a clip, beside the palette),
+  `requestpaste` (trigger the macOS PostEvent prompt for auto-paste E2E).
 - **Inspect**: read `_debug_state.json` (clipCount, clips, favorites, paletteKey,
-  firstResponder, canPostEvents, isPaused…).
+  firstResponder, canPostEvents, isPaused, `paletteFrame`, `windows` (class/level/frame of every
+  visible window), `peekVisible`, `peekLog` (why the hover card appeared or disappeared)…).
+- **Hover E2E without a human**: `windows` + `paletteFrame` give real screen coordinates, and
+  `CGWarpMouseCursorPosition` + a posted `mouseMoved` (Accessibility, no Screen Recording) will
+  drive a real hover; `peekLog` then says exactly why a card showed or hid. This is how the
+  hover card's "appears, stays, follows, dismisses" behaviour was verified on both surfaces.
 - **See the UI with no Screen Recording permission**: `snapshot` renders the app's own
   windows to PNGs in `_snapshots/` (ImageRenderer + NSView `cacheDisplay`); read those
   PNGs directly. Findings: `cacheDisplay` is flaky for SwiftUI text/buttons on some
@@ -185,6 +191,25 @@ Typical loop: edit → `xcodebuild build` → relaunch the Debug app → drive v
   Command-Line Tools** button symlinks them into `/usr/local/bin` (clipboard fallback if it's
   not writable). `CLIToolsTests` (app-hosted, so `Bundle.main` = the app) guards the embedding.
   The two `tool` targets build automatically as app copy-dependencies (no scheme entry needed).
+- `ClipInspector` / `ClipInspectorCard` / `ClipPeek` — the **hover preview card**. `ClipInspector`
+  is the pure, tested content model (title · middle-elided head+tail preview · stats · provenance ·
+  ⌘O hint) — long clips drop the **middle**, never the tail, because the ending is what separates
+  near-identical clips; cuts land on word boundaries; a masked secret stays masked (the card must
+  not re-open the hole row masking closes) and is never lexed. `ClipInspectorCard` is layout only.
+  `ClipPeek` owns *when and where*: a 0.4s hover dwell (0.55s for keyboard selection, which anchors
+  beside the palette instead of the pointer), warm swaps with no second wait, a 0.12s exit grace,
+  and a **watchdog** that re-checks the reason to exist every 0.25s — AppKit does not reliably
+  deliver hover-exit when the pointer leaves a window, and a menu can vanish under the card.
+  It lives in its own `ClipPeekPanel`: borderless, non-activating, `canBecomeKey == false`,
+  `ignoresMouseEvents` (so the row underneath stays hovered), one level above `.popUpMenu` so it
+  clears the menu dropdown. `ClipPeekLayout.frame(...)` is pure: beside the host window, flipped
+  when the right edge is full, always fully on screen.
+- `ClipSyntax` — **content-aware formatting inside the card**: format detection (diff · JSON ·
+  code · URL), a small language-agnostic lexer (comments/strings/numbers/keywords/JSON keys),
+  diff line roles, URL host + tracking-parameter spans, and an order-preserving **JSON
+  re-indenter** (a whitespace-only pass over the same tokens — never a decode/re-encode, which
+  would reorder keys; the card labels it `formatted`). Pure, offset-based spans → trivially
+  testable. It is a lexer, not a parser: it never rewrites a clip.
 - `Onboarding*`, `Settings*` (General / Privacy / Developer / About — General has a
   `KeyboardShortcuts.Recorder` to rebind the ⇧⌘V palette hotkey), `SnippetComposer*`,
   `Preferences`, `LaunchAtLogin` (SMAppService), `UpdaterController` (Sparkle),
@@ -264,5 +289,6 @@ contributor scaffolding (CONTRIBUTING/SECURITY/CHANGELOG/issue+PR templates).
 
 Open / next (P2 from the CEO review in `~/.gstack/projects/.../ceo-plans/`): bind the
 `DesignSystem` tokens + extract a shared `ClipRow` (menu/palette divergence); content depth —
-clip **detail/preview** pane, row timestamps + source-app icon, image dimensions, delete-undo;
+row timestamps, delete-undo (the **hover preview card** now covers the detail/preview pane,
+source-app icon, and image dimensions);
 then file clips, OCR, the Swift 6 language-mode flip, off-main *capture*, and an orphan-blob sweep.
