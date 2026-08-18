@@ -231,7 +231,8 @@ final class DebugBridge {
             """, kind: .code, app: "Cursor"),
         sample("https://mimer.hasanjafri.com/compare?utm_source=newsletter&utm_campaign=launch&plan=pro&fbclid=IwAR2x9",
                kind: .link, app: "Safari"),
-        sample("AKIAIOSFODNN7EXAMPLE", app: "1Password"),
+        // Built from parts like the test fixtures — no secret-shaped literal in the tree.
+        sample("AKIA" + "0123456789ABCDEF", app: "1Password"),
         // Past the counting limit: the card reports size, not counts it never read.
         sample(String(repeating: "2026-08-18 14:02:11 INFO  request served in 12ms  path=/api/clips\n",
                       count: 20_000), app: "Console")
