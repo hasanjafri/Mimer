@@ -152,6 +152,17 @@ enum ClipSyntax {
 
     // MARK: - Spans
 
+    /// Clip spans to `range` and rebase them to start at 0 — how a lexed *window* becomes spans
+    /// for the slice the card actually shows.
+    static func rebase(_ spans: [Span], to range: Range<Int>) -> [Span] {
+        spans.compactMap { span in
+            let lower = max(span.range.lowerBound, range.lowerBound)
+            let upper = min(span.range.upperBound, range.upperBound)
+            guard lower < upper else { return nil }
+            return Span(range: (lower - range.lowerBound)..<(upper - range.lowerBound), style: span.style)
+        }
+    }
+
     static func spans(for text: String, format: Format) -> [Span] {
         switch format {
         case .plain: return []

@@ -70,6 +70,49 @@ final class ClipInspectorTests: XCTestCase {
         XCTAssertEqual(preview.head, "body")
     }
 
+    // MARK: - Fragment context
+
+    /// The tail is the only shown slice with text before it, and lexing it alone gets it wrong.
+    /// Here the tail opens *inside* a string literal: on its own the lexer reads the closing
+    /// quote as an opener and paints everything after it; with context it sees the string end.
+    func testTailIsLexedWithTheTextBeforeIt() {
+        let filler = String(repeating: "let x = 1\n", count: 120)
+        let display = ClipInspector.displayText(filler + "let b = \"AAAABBBBCCCC\" trailing")
+        let tail = String(display.suffix(18))          // BBBBCCCC" trailing
+        XCTAssertTrue(tail.hasPrefix("BBBBCCCC\""), "tail must open inside the literal")
+
+        let alone = ClipSyntax.spans(for: tail, format: .code)
+        let withContext = ClipInspector.tailSpans(display, tail: tail, format: .code)
+
+        XCTAssertEqual(withContext.first?.range.lowerBound, 0, "the tail begins inside the string")
+        XCTAssertEqual(withContext.first?.range.upperBound, 9, "which ends at its closing quote")
+        XCTAssertEqual(withContext.first?.style, .string)
+        XCTAssertFalse(withContext.contains { $0.range.contains(12) }, "'trailing' is code, not string")
+
+        XCTAssertNotEqual(alone, withContext)
+        XCTAssertTrue(alone.contains { $0.range.contains(12) },
+                      "lexed alone it swallows the rest — the bug this closes")
+    }
+
+    func testTailSpansAreEmptyWithoutATail() {
+        XCTAssertTrue(ClipInspector.tailSpans("whole clip", tail: "", format: .code).isEmpty)
+    }
+
+    /// The head begins where the clip begins, so it needs no context — the model must still
+    /// hand the card spans for it.
+    func testBothShownSlicesCarrySpans() {
+        let code = (1...60).map { "let value\($0) = \"string \($0)\"  // note \($0)" }.joined(separator: "\n")
+        let item = clip(code, kind: .code)
+        guard case .text(let preview) = ClipInspector.make(for: item, maskSecrets: true).content else {
+            return XCTFail("expected a text preview")
+        }
+        XCTAssertTrue(preview.isElided)
+        XCTAssertFalse(preview.headSpans.isEmpty)
+        XCTAssertFalse(preview.tailSpans.isEmpty)
+        XCTAssertTrue(preview.headSpans.allSatisfy { $0.range.upperBound <= preview.head.count })
+        XCTAssertTrue(preview.tailSpans.allSatisfy { $0.range.upperBound <= preview.tail.count })
+    }
+
     // MARK: - Stats
 
     func testStatsCountCharactersWordsAndLines() {

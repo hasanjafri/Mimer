@@ -216,6 +216,12 @@ Typical loop: edit → `xcodebuild build` → relaunch the Debug app → drive v
   and an order-preserving **JSON re-indenter** (a whitespace-only pass over the same tokens — never a decode/re-encode, which
   would reorder keys; the card labels it `formatted`). Pure, offset-based spans → trivially
   testable. It is a lexer, not a parser: it never rewrites a clip.
+  **Fragment context is the trap here:** the card shows a head *and* a tail, and a fragment lexed
+  on its own doesn't know it begins inside a string, a comment, or a diff hunk. The head starts
+  where the clip starts so it needs none; the **tail is lexed with a bounded lookbehind**
+  (`ClipInspector.tailSpans`) and the spans are clipped + rebased (`ClipSyntax.rebase`). Diff line
+  roles come from one positional classifier (`ClipSyntax.diffRoles`) shared by detection,
+  colouring, and the badge, and only a fragment's *first* line may be read by shape.
 - `Onboarding*`, `Settings*` (General / Privacy / Developer / About — General has a
   `KeyboardShortcuts.Recorder` to rebind the ⇧⌘V palette hotkey), `SnippetComposer*`,
   `Preferences`, `LaunchAtLogin` (SMAppService), `UpdaterController` (Sparkle),

@@ -126,6 +126,21 @@ final class ClipSyntaxTests: XCTestCase {
         XCTAssertFalse(ClipSyntax.isTrackingParameter("page"))
     }
 
+    func testRebaseClipsAndShiftsToZero() {
+        let spans = [ClipSyntax.Span(range: 0..<5, style: .comment),
+                     ClipSyntax.Span(range: 8..<20, style: .string),
+                     ClipSyntax.Span(range: 25..<30, style: .number)]
+        let rebased = ClipSyntax.rebase(spans, to: 10..<28)
+        XCTAssertEqual(rebased, [ClipSyntax.Span(range: 0..<10, style: .string),
+                                 ClipSyntax.Span(range: 15..<18, style: .number)])
+    }
+
+    func testRebaseDropsSpansOutsideTheRange() {
+        let spans = [ClipSyntax.Span(range: 0..<5, style: .comment)]
+        XCTAssertTrue(ClipSyntax.rebase(spans, to: 10..<20).isEmpty)
+        XCTAssertTrue(ClipSyntax.rebase(spans, to: 5..<5).isEmpty)
+    }
+
     func testSpansStayInsideTheText() {
         for format in [ClipSyntax.Format.code, .diff, .url, .json(reindented: true)] {
             for text in ["", "x", "\n\n", #"{"a":"#, "https://", "// unterminated \"string"] {

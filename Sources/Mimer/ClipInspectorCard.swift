@@ -97,10 +97,10 @@ struct ClipInspectorCard: View {
 
     private func textContent(_ preview: ClipInspector.Preview) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            body(preview.head, monospaced: preview.monospaced)
+            body(preview.head, monospaced: preview.monospaced, spans: preview.headSpans)
             if preview.isElided {
                 elisionMarker(preview.elided, hiddenMatches: preview.hiddenMatches)
-                body(preview.tail, monospaced: preview.monospaced)
+                body(preview.tail, monospaced: preview.monospaced, spans: preview.tailSpans)
             }
         }
         .padding(14)
@@ -108,8 +108,8 @@ struct ClipInspectorCard: View {
         .fixedSize(horizontal: false, vertical: true)
     }
 
-    private func body(_ text: String, monospaced: Bool) -> some View {
-        Text(highlighted(text))
+    private func body(_ text: String, monospaced: Bool, spans: [ClipSyntax.Span]) -> some View {
+        Text(highlighted(text, spans: spans))
             .font(monospaced ? .system(size: 11.5, design: .monospaced) : .system(size: 12.5))
             .foregroundStyle(.primary)
             .lineSpacing(1.5)
@@ -175,8 +175,7 @@ struct ClipInspectorCard: View {
     /// Paints the body in one pass: syntax colour from `ClipSyntax` underneath, the palette's
     /// search term highlighted on top — including in the middle of a long clip, which is the
     /// part a truncated row can never show.
-    private func highlighted(_ text: String) -> AttributedString {
-        let spans = ClipSyntax.spans(for: text, format: inspector.format)
+    private func highlighted(_ text: String, spans: [ClipSyntax.Span]) -> AttributedString {
         let hits = ClipInspector.highlightRanges(in: text, query: inspector.query)
         guard !spans.isEmpty || !hits.isEmpty else { return AttributedString(text) }
 

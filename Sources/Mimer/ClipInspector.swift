@@ -39,6 +39,10 @@ struct ClipInspector: Equatable, Sendable {
         /// Search matches that fall inside the elided middle. Without this a clip could match
         /// your search entirely in the part the card doesn't show, with nothing to say so.
         var hiddenMatches: Int = 0
+        /// Syntax spans for each shown slice, computed here rather than in the view so the
+        /// context rules below are testable and the render path stays layout-only.
+        var headSpans: [ClipSyntax.Span] = []
+        var tailSpans: [ClipSyntax.Span] = []
         var isElided: Bool { elided > 0 }
     }
 
@@ -96,6 +100,11 @@ struct ClipInspector: Equatable, Sendable {
                                charBudget: structured ? structuredCharBudget : charBudget,
                                lineBudget: structured ? structuredLineBudget : lineBudget)
             text.hiddenMatches = hiddenMatchCount(in: body, preview: text, query: query)
+            let display = displayText(body)
+            // The head starts where the clip starts, so lexing it alone is already correct. The
+            // tail is the fragment with no context — see `tailSpans`.
+            text.headSpans = ClipSyntax.spans(for: text.head, format: format)
+            text.tailSpans = tailSpans(display, tail: text.tail, format: format)
             content = .text(text)
         }
 
@@ -113,6 +122,25 @@ struct ClipInspector: Equatable, Sendable {
             isFavorite: item.isFavorite,
             query: query
         )
+    }
+
+    /// How much text before the tail is lexed for context.
+    static let tailLookbehind = 8_000
+
+    /// Spans for the tail, lexed **together with the text that precedes it**. A fragment lexed on
+    /// its own has no idea it begins inside a string, a comment, or a hunk — a tail starting just
+    /// after a closing quote would read that quote as an opener and paint the rest as a string.
+    /// The lookbehind is bounded so hovering a megabyte-long clip stays cheap; a construct longer
+    /// than that degrades to the fragment's own reading, which is where this started.
+    static func tailSpans(_ display: String, tail: String,
+                          format: ClipSyntax.Format,
+                          lookbehind: Int = ClipInspector.tailLookbehind) -> [ClipSyntax.Span] {
+        guard !tail.isEmpty else { return [] }
+        let tailStart = display.count - tail.count
+        let contextStart = max(0, tailStart - lookbehind)
+        let window = String(display.dropFirst(contextStart))
+        let spans = ClipSyntax.spans(for: window, format: format)
+        return ClipSyntax.rebase(spans, to: (tailStart - contextStart)..<window.count)
     }
 
     /// How many search matches are in the part of the clip the card doesn't show — the head is a
