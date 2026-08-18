@@ -6,6 +6,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-08-18
+
 ### Added
 - **Hover preview card** — pause on a clip in the menu or the palette and the full clip appears
   in a card beside the list. Long clips keep their start **and** their end (the middle is
