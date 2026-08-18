@@ -56,6 +56,11 @@ Free and open source (MIT) — and it stays that way. If you've used **Maccy** o
 **Hover preview** — pause on a row (in the menu or the palette) and the whole clip appears
 beside it, read the way it was written:
 
+<p align="center">
+  <img src="docs/media/preview-card.png" alt="Three Mimer hover preview cards: JSON re-wrapped for reading, a diff with coloured +/- lines and a +10 -5 badge, and code with comments, keywords and strings" width="820">
+</p>
+
+
 - long clips elide the **middle**, never the ends — the tail is usually what tells two
   near-identical clips apart;
 - **JSON** is re-wrapped for reading (whitespace only — key order and values are untouched),

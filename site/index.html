@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Mimer — Fast, private, developer-first clipboard manager for macOS</title>
-<meta name="description" content="Mimer is a free, open-source clipboard manager for macOS. A fast ⇧⌘V command palette with type-aware history, ⌘K transforms, scoped search, and encrypted-at-rest privacy. A free alternative to Maccy and CopyClip, built for developers.">
+<meta name="description" content="Mimer is a free, open-source clipboard manager for macOS. A fast ⇧⌘V command palette with type-aware history, hover previews that show a clip in full, ⌘K transforms, scoped search, and encrypted-at-rest privacy. A free alternative to Maccy and CopyClip, built for developers.">
 <meta name="keywords" content="clipboard manager, macOS clipboard manager, clipboard history, menu bar app, developer tools, Maccy alternative, CopyClip alternative, open source, Swift, SwiftUI, command palette, paste history">
 <meta name="author" content="Hasan Jafri">
 <meta name="theme-color" content="#4A40E6">
@@ -50,6 +50,7 @@
   ],
   "featureList": [
     "Type-aware clipboard history (links, code, colors, git SHAs, issue keys, file paths)",
+    "Hover preview card showing a clip in full, with JSON, diffs, code and URLs formatted for what they are",
     "⌘K transforms with live preview (case, slugify, Base64/URL, JSON pretty-print, JSON to TypeScript, decode JWT, Unix to ISO)",
     "Scoped search (type:, app:, /regex/) and a paste-stack",
     "History encrypted at rest with on-screen secret masking",
@@ -169,6 +170,10 @@
       <p>Reshape a clip in place with a live preview: case, slugify, Base64/URL, JSON pretty-print, <strong>JSON → TypeScript</strong>, <strong>decode a JWT</strong>, Unix ↔ ISO time, and more. Only the transforms that apply are shown.</p>
     </div>
     <div class="feature">
+      <h3>Hover to read the whole clip</h3>
+      <p>Pause on a clip and the full text appears beside the list — long clips keep their start <strong>and</strong> their end, so near-identical ones are finally tellable apart. Formatted for what it is: JSON re-wrapped, diffs coloured, a URL's host and tracking parameters picked out.</p>
+    </div>
+    <div class="feature">
       <h3>Built for developers</h3>
       <p>Scoped search (<code>type:</code>, <code>app:</code>, <code>/regex/</code>), a paste-stack, and <span class="kbd">⌘O</span> to open a commit, an issue, or a <code>file:line</code> straight in your browser, tracker, or editor.</p>
     </div>
@@ -178,6 +183,10 @@
     </div>
   </div>
 
+  <figure>
+    <img src="media/preview-card.png" alt="Three Mimer hover preview cards: JSON re-wrapped for reading, a diff with coloured +/- lines, and code with comments, keywords and strings" loading="lazy">
+    <figcaption>Hover a clip and it appears in full beside the list, formatted for what it is — the middle is elided, never the ends.</figcaption>
+  </figure>
   <figure>
     <img src="media/transform.png" alt="Mimer ⌘K transform menu showing live previews for a selected clip" loading="lazy">
     <figcaption>⌘K transforms — every transform shows a live preview, and only the ones that apply are listed.</figcaption>
