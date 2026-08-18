@@ -59,11 +59,11 @@ enum ClipSyntax {
     static func diffRoles(_ text: String) -> [Style?] {
         let lines = text.split(separator: "\n", omittingEmptySubsequences: false)
 
-        // The card lexes the previewed head and tail separately, so this is often a *fragment*
-        // of a patch. A fragment with no hunk header of its own is mid-hunk content — start there,
-        // or the tail of a long diff (the part the preview exists to show) would read as headers.
-        var inHeaderBlock = lines.contains(where: isHunkHeader)
-            || lines.first.map { $0.hasPrefix("diff ") || $0.hasPrefix("index ") } == true
+        // The card lexes the previewed head and tail separately, so this is often a *fragment* of
+        // a patch, with no context before its first line. Only that first line can say whether we
+        // begin inside a header block — a hunk header *later* in the fragment says nothing about
+        // the change lines before it, which belong to the previous hunk.
+        var inHeaderBlock = lines.first.map(opensHeaderBlock) == true
 
         var roles: [Style?] = []
         for line in lines {
@@ -88,6 +88,18 @@ enum ClipSyntax {
 
     static func isHunkHeader<S: StringProtocol>(_ line: S) -> Bool {
         line.hasPrefix("@@") && line.dropFirst(2).contains("@@")
+    }
+
+    /// Whether a line begins a file's header block. Used only for the *first* line of a fragment,
+    /// where there is no position to reason from — everywhere else, position decides. `--- `/`+++ `
+    /// with the space is git's own header form; `+++foo` is content.
+    static func opensHeaderBlock<S: StringProtocol>(_ line: S) -> Bool {
+        for prefix in ["diff ", "index ", "--- ", "+++ ", "old mode ", "new mode ",
+                       "new file mode ", "deleted file mode ", "similarity index ",
+                       "rename ", "copy ", "Binary files "] where line.hasPrefix(prefix) {
+            return true
+        }
+        return false
     }
 
     static func isJSON(_ text: String) -> Bool {

@@ -220,6 +220,18 @@ final class ClipInspectorBadgeTests: XCTestCase {
         XCTAssertNil(byStyle[.meta], "a mid-hunk fragment has no headers in it")
     }
 
+    /// A fragment can span the end of one hunk and the header of the next. The later `@@` says
+    /// nothing about the change lines before it — those belong to the previous hunk.
+    func testChangeLinesBeforeALaterHunkHeaderKeepTheirColours() {
+        let fragment = "+        watchdog.start()\n-        watchdog.stop()\n@@ -84,10 +86,14 @@ func present() {\n         let panel = panel"
+        let found = styledSpans(fragment, .diff)
+        XCTAssertTrue(found.contains { $0 == ("+        watchdog.start()", .added) })
+        XCTAssertTrue(found.contains { $0 == ("-        watchdog.stop()", .removed) })
+        XCTAssertTrue(found.contains { $0.1 == .hunk })
+        XCTAssertNil(Dictionary(grouping: found, by: \.1)[.meta],
+                     "no file headers appear in this fragment")
+    }
+
     func testAHeaderOnlyFragmentStillReadsAsHeaders() {
         let head = "diff --git a/x b/x\nindex 1111111..2222222 100644"
         let byStyle = Dictionary(grouping: styledSpans(head, .diff), by: \.1).mapValues { $0.count }
