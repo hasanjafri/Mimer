@@ -133,8 +133,11 @@ final class DebugBridge {
         // Hover cards: the newest real clip, plus a synthetic long one so the middle-elision
         // treatment is always in the snapshot set even when the history has no long clips.
         if let first = menuItems.first {
+            // Masking is forced on for the render, not read from the preference: these PNGs sit
+            // on disk until the next snapshot, and a debug artifact must never be the thing that
+            // writes a plaintext secret to a file.
             write(renderPNG(ClipInspectorCard(inspector: ClipInspector.make(for: first,
-                                                                           maskSecrets: Preferences.shared.maskSecrets,
+                                                                           maskSecrets: true,
                                                                            action: ClipAction.of(first.text, config: Preferences.shared.devConfig))),
                             width: ClipInspectorCard.width), "render-peek.png")
         }

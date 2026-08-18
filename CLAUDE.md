@@ -205,7 +205,12 @@ Typical loop: edit → `xcodebuild build` → relaunch the Debug app → drive v
   size is `SecretDetector`, which scans the full text (pre-existing, and also runs per row render).
   `ClipPeek` owns *when and where*: a 0.4s hover dwell (0.55s for keyboard selection, which anchors
   beside the palette instead of the pointer), warm swaps with no second wait, a 0.12s exit grace,
-  and a **watchdog** that re-checks the reason to exist every 0.25s — AppKit does not reliably
+  **The dwell is 0.4s of real time**, so `present()` re-validates everything that was true when it
+  started (preference, masking, host still visible, pointer still inside) and only *then* builds the
+  inspector — crossing ten rows must not pay for ten cards, and presenting into a torn-down menu is
+  how a card ends up stranded over another app. A captured-then-deallocated host (`hostExpected`)
+  hides immediately; a host that merely *moved* (the palette is draggable) is followed.
+  There is a **watchdog** that re-checks the reason to exist every 0.25s — AppKit does not reliably
   deliver hover-exit when the pointer leaves a window, and a menu can vanish under the card. The
   watchdog also **fails closed on a masking-preference change** (a card built while masking was
   off must not stay on screen once it's on) and falls back to pointer drift when no host window

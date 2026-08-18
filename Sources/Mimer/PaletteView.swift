@@ -104,6 +104,9 @@ struct PaletteView: View {
             if transformTarget != nil { transformSelection = 0 } else { selection = 0 }
         }
         .onChange(of: results.count) { if selection >= results.count { selection = max(0, results.count - 1) } }
+        // A capture (or a re-copy) reorders history under a fixed selection index, so the card
+        // could end up describing a different clip than the one ⏎ would paste. Drop it.
+        .onChange(of: store.items.first?.id) { ClipPeek.shared.hide(reason: "history-changed") }
         .onChange(of: transformTarget?.id) {
             ClipPeek.shared.hide(reason: "transform-mode")   // transform mode lists transforms, not clips
             DispatchQueue.main.async { searchFocused = true }

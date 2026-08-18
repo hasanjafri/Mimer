@@ -31,7 +31,14 @@ final class ClipPeek {
     private var dwell: Timer?
     private var watchdog: Timer?
     private weak var host: NSWindow?
-    private var pending: (id: UUID, card: ClipInspectorCard, anchor: Anchor)?
+    /// Whether a host window was captured for this card. A weak `host` that has since gone nil
+    /// means the menu or palette was torn down — not that there never was one.
+    private var hostExpected = false
+    private var hostFrame: NSRect = .zero
+    /// The request, not a built card. Building the inspector reads the clip (secret detection
+    /// alone scans all of it), so it happens when the dwell fires — otherwise sweeping the pointer
+    /// across ten rows pays for ten cards nobody sees.
+    private var pending: (item: ClipItem, query: String, action: ClipAction?, revealed: Bool, anchor: Anchor)?
     private var shownID: UUID?
     private var anchoredToPointer = false
     private var anchorPoint: NSPoint = .zero
@@ -69,7 +76,7 @@ final class ClipPeek {
     /// between rows never flickers.
     func endHover(_ id: UUID) {
         guard anchoredToPointer else { return }   // a keyboard-anchored card isn't the pointer's to dismiss
-        guard pending?.id == id || shownID == id else { return }
+        guard pending?.item.id == id || shownID == id else { return }
         // Leave on a short grace: moving between two rows fires exit-then-enter, and AppKit can
         // emit a spurious exit mid-row. A real departure still reads as instant.
         exitGrace?.invalidate()
@@ -107,17 +114,13 @@ final class ClipPeek {
         // keyboard taking over a card the pointer opened), so that re-presents.
         guard shownID != item.id || !isVisible || anchoredToPointer != anchor.isPointer else { return }
 
-        let inspector = ClipInspector.make(for: item,
-                                           maskSecrets: Preferences.shared.maskSecrets,
-                                           revealed: revealed,
-                                           action: action,
-                                           query: query)
         log("show \(anchor.isPointer ? "hover" : "keyboard")")
         self.host = host
+        hostExpected = host != nil
         anchoredToPointer = anchor.isPointer
         maskedWhenShown = Preferences.shared.maskSecrets
         if case .pointer(let point) = anchor { anchorPoint = point }
-        pending = (item.id, ClipInspectorCard(inspector: inspector), anchor)
+        pending = (item, query, action, revealed, anchor)
 
         dwell?.invalidate()
         if isVisible {
@@ -130,14 +133,30 @@ final class ClipPeek {
     private func present() {
         guard let pending else { return }
         dwell?.invalidate(); dwell = nil
-        // The card was built when the dwell started; if masking has been switched on since, it
-        // holds a secret it may no longer show. Drop it rather than present and then retract.
+
+        // Everything that was true when the dwell started has to still be true. A dwell is 0.4s of
+        // real time: the menu can close, the palette can dismiss, the preference can flip, and the
+        // pointer can leave — presenting anyway is how a card ends up stranded over another app.
+        guard Preferences.shared.previewOnHover else { self.pending = nil; return }
         guard Preferences.shared.maskSecrets == maskedWhenShown else { hide(reason: "masking-changed"); return }
+        if hostExpected {
+            guard let host, host.isVisible else { hide(reason: "host-gone-before-present"); return }
+            if anchoredToPointer, !host.frame.insetBy(dx: -4, dy: -4).contains(NSEvent.mouseLocation) {
+                hide(reason: "pointer-left-before-present"); return
+            }
+        }
+
+        let inspector = ClipInspector.make(for: pending.item,
+                                           maskSecrets: Preferences.shared.maskSecrets,
+                                           revealed: pending.revealed,
+                                           action: pending.action,
+                                           query: pending.query)
+        let card = ClipInspectorCard(inspector: inspector)
 
         let panel = self.panel ?? ClipPeekPanel()
         self.panel = panel
 
-        let hosting = NSHostingView(rootView: pending.card)
+        let hosting = NSHostingView(rootView: card)
         panel.contentView = hosting
         hosting.layoutSubtreeIfNeeded()
 
@@ -162,7 +181,8 @@ final class ClipPeek {
                 panel.animator().alphaValue = 1
             }
         }
-        shownID = pending.id
+        shownID = pending.item.id
+        hostFrame = host?.frame ?? .zero
         self.pending = nil
         log("shown host=\(host == nil ? "none" : "yes") pointer=\(anchoredToPointer)")
         startWatchdog()
@@ -186,8 +206,10 @@ final class ClipPeek {
         guard Preferences.shared.maskSecrets == maskedWhenShown else { hide(reason: "masking-changed"); return }
 
         guard let host else {
-            // No host window to watch (the pointer was over something we couldn't identify).
-            // Fall back to the pointer itself, so a missed hover-exit can't strand the card.
+            // A host we captured has since been deallocated — the menu or palette is gone, so the
+            // card is describing nothing. (A card that never had a host falls back to the pointer,
+            // so a missed hover-exit still can't strand it.)
+            if hostExpected { hide(reason: "host-deallocated"); return }
             if anchoredToPointer, hypot(NSEvent.mouseLocation.x - anchorPoint.x,
                                         NSEvent.mouseLocation.y - anchorPoint.y) > 60 {
                 hide(reason: "pointer-moved")
@@ -195,6 +217,8 @@ final class ClipPeek {
             return
         }
         guard host.isVisible else { hide(reason: "host-gone"); return }
+        // The palette is draggable: follow it rather than leaving the card on the old screen.
+        if host.frame != hostFrame { reposition(to: host) }
         // A pointer-anchored card belongs to the pointer: once it leaves the window the card is
         // stale, even if the row never delivered its exit. Keyboard-anchored cards ignore this.
         if anchoredToPointer, !host.frame.insetBy(dx: -4, dy: -4).contains(NSEvent.mouseLocation) {
@@ -220,6 +244,21 @@ final class ClipPeek {
         }
         RunLoop.main.add(timer, forMode: .common)
         return timer
+    }
+
+    /// Re-place a visible card against its host's new frame (the palette moved, or the display
+    /// geometry changed) without rebuilding its content.
+    private func reposition(to host: NSWindow) {
+        guard let panel, panel.isVisible else { return }
+        hostFrame = host.frame
+        let visible = (NSScreen.screens.first { $0.frame.contains(NSPoint(x: host.frame.midX, y: host.frame.midY)) }
+                       ?? NSScreen.main)?.visibleFrame ?? .zero
+        let pointer = anchoredToPointer
+            ? NSEvent.mouseLocation
+            : NSPoint(x: host.frame.midX, y: host.frame.midY)
+        panel.setFrame(ClipPeekLayout.frame(size: panel.frame.size, host: host.frame,
+                                            pointer: pointer, visible: visible),
+                       display: true)
     }
 
     private func window(under point: NSPoint) -> NSWindow? {
