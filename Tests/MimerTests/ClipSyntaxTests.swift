@@ -184,13 +184,13 @@ final class ClipInspectorBadgeTests: XCTestCase {
     }
 
     func testASecretIsNeverSyntaxHighlightedIntoTheOpen() {
-        let item = ClipItem(id: UUID(), text: "AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCY",
+        let item = ClipItem(id: UUID(), text: "AWS_SECRET_ACCESS_" + "KEY=" + String(repeating: "z", count: 30),
                             kind: .text, createdAt: Date(), isFavorite: false)
         let inspector = ClipInspector.make(for: item, maskSecrets: true)
         guard case .masked(let shown) = inspector.content else {
             return XCTFail("a detected secret must render masked, whatever its content shape")
         }
-        XCTAssertFalse(shown.contains("wJalrXUtnFEMI"))
+        XCTAssertFalse(shown.contains("zzzzzzzz"))
         XCTAssertEqual(inspector.format, .plain, "masked content is never lexed")
     }
 

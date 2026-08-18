@@ -46,3 +46,47 @@ final class SecretDetectorTests: XCTestCase {
         XCTAssertNil(SecretDetector.maskedPreview("hello world"))
     }
 }
+
+/// Detection is bounded: it runs on every row render, so it reads a window rather than the
+/// whole clip. A key at the top of a large file is still masked; one buried past the window
+/// is the accepted cost.
+extension SecretDetectorTests {
+    func testAKeyAtTheTopOfALargeDocumentIsStillDetected() {
+        let big = pem + "\n" + String(repeating: "filler line of an otherwise ordinary file\n", count: 200_000)
+        XCTAssertGreaterThan(big.utf8.count, SecretDetector.scanLimit)
+        XCTAssertEqual(SecretDetector.kind(of: big), "Private key")
+    }
+
+    func testASecretBuriedPastTheWindowIsNotDetected() {
+        let filler = String(repeating: "ordinary text that is not a secret at all\n", count: 200_000)
+        let buried = filler + pem
+        XCTAssertNil(SecretDetector.kind(of: buried),
+                     "documented tradeoff: scanning megabytes on every row render costs more")
+    }
+
+    func testOrdinarySecretsAreUnaffectedByTheWindow() {
+        XCTAssertEqual(SecretDetector.kind(of: aws), "AWS key")
+        XCTAssertEqual(SecretDetector.maskedPreview(aws), "AWS key ••••CDEF")
+        XCTAssertEqual(SecretDetector.maskedPreview("ghp_" + String(repeating: "a", count: 32) + "WXYZ"),
+                       "GitHub token ••••WXYZ")
+    }
+
+    /// The last-4 hint comes from the real end of the clip, not the end of the scan window.
+    func testLastFourComesFromTheRealEndOfAHugeToken() {
+        let token = "sk-" + String(repeating: "a", count: SecretDetector.scanLimit) + "TAIL"
+        XCTAssertEqual(SecretDetector.maskedPreview(token), "API key ••••TAIL")
+    }
+
+    func testTrailingWhitespaceDoesNotBecomeTheHint() {
+        XCTAssertEqual(SecretDetector.maskedPreview(aws + "\n"), "AWS key ••••CDEF")
+    }
+
+    /// The window is 64 KB of *bytes*: a clip of multibyte text must not be scanned four times
+    /// deeper than documented just because its characters are wide.
+    func testTheWindowIsMeasuredInBytesNotCharacters() {
+        let wide = String(repeating: "日", count: SecretDetector.scanLimit / 2)   // 3 bytes each
+        XCTAssertGreaterThan(wide.utf8.count, SecretDetector.scanLimit)
+        XCTAssertNil(SecretDetector.kind(of: wide + pem), "past the byte window, so not detected")
+        XCTAssertEqual(SecretDetector.kind(of: pem + wide), "Private key")
+    }
+}

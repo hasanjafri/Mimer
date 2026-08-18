@@ -8,11 +8,30 @@ import Foundation
 /// clips. A false positive is cheap anyway — the clip is still stored and pasteable, just
 /// shown masked — but needless masking is annoying, so the rules favor known shapes.
 enum SecretDetector {
+    /// How much of a clip is examined. Every shape below is short — the longest is a PEM block at
+    /// a few kilobytes — but this runs on **every row render** in the menu and palette, and
+    /// `trimmingCharacters` alone copies whatever it is handed. A 5 MB clip cost ~77 ms per scan.
+    ///
+    /// A window rather than a size refusal, deliberately: a key at the top of a large file is
+    /// still masked, which is the case that actually happens. Only a secret buried past the
+    /// window goes unmasked.
+    static let scanLimit = 64 * 1024
+
     static func isSecret(_ text: String) -> Bool { kind(of: text) != nil }
+
+    /// The slice examined for secret shapes: the whole clip when it's a normal size, its opening
+    /// otherwise. Cheap to decide — `utf8.count` is O(1), unlike `count`.
+    private static func scanWindow(_ text: String) -> String {
+        guard text.utf8.count > scanLimit else { return text }
+        // Sliced by bytes, not characters: `prefix(scanLimit)` counts characters, so a clip of
+        // multibyte text would scan up to four times the window this documents. A partial
+        // character at the cut decodes to U+FFFD, which no rule below can match anyway.
+        return String(decoding: text.utf8.prefix(scanLimit), as: UTF8.self)
+    }
 
     /// A short human label for the detected secret kind (used in the masked display), or nil.
     static func kind(of text: String) -> String? {
-        let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let t = scanWindow(text).trimmingCharacters(in: .whitespacesAndNewlines)
         guard !t.isEmpty else { return nil }
 
         // PEM private-key block (multi-line; the one secret shape with whitespace).
@@ -34,10 +53,17 @@ enum SecretDetector {
     /// or nil if `text` isn't a secret. The real value is never altered — only the display.
     static func maskedPreview(_ text: String) -> String? {
         guard let label = kind(of: text) else { return nil }
-        let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let t = scanWindow(text).trimmingCharacters(in: .whitespacesAndNewlines)
         // Last-4 hint only for single-token secrets; multi-line (PEM) / spaced blobs show the bare label.
         guard !t.contains(where: \.isWhitespace), t.count >= 8 else { return "\(label) ••••" }
-        return "\(label) ••••\(t.suffix(4))"
+        return "\(label) ••••\(lastFour(of: text))"
+    }
+
+    /// The final four characters of the clip, ignoring trailing whitespace — found by scanning
+    /// back from the end rather than trimming (which would copy the whole clip).
+    private static func lastFour(of text: String) -> String {
+        guard let end = text.lastIndex(where: { !$0.isWhitespace }) else { return "" }
+        return String(text[...end].suffix(4))
     }
 
     // MARK: - Rules

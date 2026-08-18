@@ -129,7 +129,11 @@ Typical loop: edit → `xcodebuild build` → relaunch the Debug app → drive v
   `Preferences.devConfig`): git SHA → open commit on a remote · issue key → open in a tracker
   (`{KEY}` template) · `file:line` → open in VS Code/Cursor (`vscode://file/…:line:col`). Every
   action opens a URL or reveals a file — never executes anything; web links stay http/https-only.
-- `SecretDetector` — pure, high-precision detection of secrets (API keys, tokens, PEM
+- `SecretDetector` — pure, high-precision detection of secrets. Reads a **64 KB window**
+  (`scanLimit`), not the whole clip: this runs on every row render, and `trimmingCharacters` alone
+  copies whatever it's handed (~77 ms per scan on a 5 MB clip, now ~1 ms). A window rather than a
+  size refusal on purpose — a key at the top of a large file still masks; only one buried past the
+  window is missed. The last-4 hint still comes from the clip's real end. (API keys, tokens, PEM
   private keys, secret env assignments). Used to **mask** secrets in the list (lock glyph +
   `AWS key ••••1234`), NOT to skip them — Mimer is local/no-cloud and devs re-paste secrets
   on purpose, so the full value is stored + pasted; only the display is masked. Toggle:
