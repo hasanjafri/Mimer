@@ -185,25 +185,64 @@ final class ClipInspectorBadgeTests: XCTestCase {
         XCTAssertFalse(ClipSyntax.looksLikeDiff("@@ nothing @@\n context only"))
     }
 
+    /// Headers precede the hunk they describe, and on their own they are not a change — a patch
+    /// needs at least one added or removed line to be worth colouring as one.
     func testFileHeadersAloneAreNotAChange() {
-        // `+++ path` / `--- path` are headers, not added/removed lines: they must not fake a diff.
-        XCTAssertFalse(ClipSyntax.looksLikeDiff("@@ -1 +1 @@\n+++ b/x\n--- a/x"))
+        XCTAssertFalse(ClipSyntax.looksLikeDiff("--- a/x\n+++ b/x\n@@ -1 +1 @@"))
+        XCTAssertEqual(ClipInspector.badge(for: "--- a/x\n+++ b/x\n@@ -1 +1 @@", format: .diff), nil)
     }
 
-    /// A patch whose only change is a line that *starts* with the marker — a Markdown rule, a
-    /// YAML document marker — is still a patch. The space after `---` is what makes it a header.
+    /// A patch whose only change is a line that *looks* like a header — `+---` (a Markdown rule),
+    /// or a removed line whose own text began with `-- ` — is still a patch. Position decides:
+    /// after a hunk header, `---` is content.
     func testMarkerShapedContentIsStillAChange() {
         XCTAssertTrue(ClipSyntax.looksLikeDiff("@@ -1,0 +1 @@\n+---"))
         XCTAssertTrue(ClipSyntax.looksLikeDiff("@@ -1 +1,0 @@\n----"))
-        XCTAssertFalse(ClipSyntax.isFileHeader("+---"))
-        XCTAssertTrue(ClipSyntax.isFileHeader("--- a/Sources/x.swift"))
+        XCTAssertTrue(ClipSyntax.looksLikeDiff("@@ -1,0 +1 @@\n+++ still content"))
     }
 
     func testMarkerShapedContentKeepsItsColour() {
-        let patch = "@@ -1,2 +1,2 @@\n+---\n--- a/x"
+        let patch = "@@ -1,3 +1,3 @@\n+---\n--- a/x\n+++ b/x"
         let found = styledSpans(patch, .diff)
-        XCTAssertTrue(found.contains { $0 == ("+---", .added) }, "added content, not a header")
-        XCTAssertTrue(found.contains { $0 == ("--- a/x", .meta) }, "real header")
+        XCTAssertTrue(found.contains { $0 == ("+---", .added) })
+        XCTAssertTrue(found.contains { $0 == ("--- a/x", .removed) },
+                      "after a hunk header this is a removed line whose text is '-- a/x'")
+        XCTAssertTrue(found.contains { $0 == ("+++ b/x", .added) })
+    }
+
+    func testRealFileHeadersAreMetadata() {
+        let patch = """
+        diff --git a/x b/x
+        index 1111111..2222222 100644
+        --- a/x
+        +++ b/x
+        @@ -1 +1 @@
+        -old
+        +new
+        """
+        let byStyle = Dictionary(grouping: styledSpans(patch, .diff), by: \.1).mapValues { $0.map(\.0) }
+        XCTAssertEqual(byStyle[.meta], ["diff --git a/x b/x", "index 1111111..2222222 100644", "--- a/x", "+++ b/x"])
+        XCTAssertEqual(byStyle[.removed], ["-old"])
+        XCTAssertEqual(byStyle[.added], ["+new"])
+        XCTAssertEqual(ClipInspector.badge(for: patch, format: .diff), "+1 −1",
+                       "the badge counts the same roles the colouring uses")
+    }
+
+    func testHeadersOfASecondFileAreStillHeaders() {
+        let patch = """
+        diff --git a/x b/x
+        --- a/x
+        +++ b/x
+        @@ -1 +1 @@
+        -one
+        diff --git a/y b/y
+        --- a/y
+        +++ b/y
+        @@ -1 +1 @@
+        +two
+        """
+        XCTAssertEqual(ClipInspector.badge(for: patch, format: .diff), "+1 −1",
+                       "the second file's headers must not be counted as changes")
     }
 
     func testPercentEncodedTrackingNamesMatchTheTransform() {
@@ -211,6 +250,18 @@ final class ClipInspectorBadgeTests: XCTestCase {
         let found = styledSpans(url, .url)
         XCTAssertTrue(found.contains { $0.1 == .tracking && $0.0.contains("utm%5Fsource") },
                       "⌘K sees the decoded name, so the card must too")
+        XCTAssertEqual(ClipInspector.trackingParameterCount(in: url), 1, "and the badge agrees")
+    }
+
+    /// The badge is defined as a count of the highlighted spans, so the two cannot drift apart.
+    func testBadgeCountsExactlyWhatIsHighlighted() {
+        for url in ["https://x.com/a?utm_source=n&plan=pro&fbclid=z",
+                    "https://x.com/a?utm_source=n#utm_source=notaparam",
+                    "https://x.com/a?keep=1",
+                    "https://x.com/a"] {
+            let highlighted = styledSpans(url, .url).filter { $0.1 == .tracking }.count
+            XCTAssertEqual(ClipInspector.trackingParameterCount(in: url), highlighted, url)
+        }
     }
 
     func testFragmentsAreNotTracking() {

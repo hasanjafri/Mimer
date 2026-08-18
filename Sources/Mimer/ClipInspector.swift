@@ -158,9 +158,9 @@ struct ClipInspector: Equatable, Sendable {
         case .json(let reindented):
             return reindented ? "formatted" : nil
         case .diff:
-            let lines = text.split(separator: "\n", omittingEmptySubsequences: false)
-            let added = lines.filter { $0.hasPrefix("+") && !$0.hasPrefix("+++") }.count
-            let removed = lines.filter { $0.hasPrefix("-") && !$0.hasPrefix("---") }.count
+            let roles = ClipSyntax.diffRoles(text)
+            let added = roles.filter { $0 == .added }.count
+            let removed = roles.filter { $0 == .removed }.count
             guard added + removed > 0 else { return nil }
             return "+\(added) −\(removed)"
         case .url:
@@ -172,12 +172,10 @@ struct ClipInspector: Equatable, Sendable {
         }
     }
 
+    /// Counts exactly what the card highlights — the same spans, so the badge can never claim a
+    /// different number from the colouring (and inherits its percent-decoding and fragment rules).
     static func trackingParameterCount(in url: String) -> Int {
-        guard let query = url.split(separator: "?", maxSplits: 1).dropFirst().first else { return 0 }
-        return query.split(separator: "&")
-            .map { $0.split(separator: "=", maxSplits: 1).first.map(String.init) ?? "" }
-            .filter(ClipSyntax.isTrackingParameter)
-            .count
+        ClipSyntax.spans(for: url, format: .url).filter { $0.style == .tracking }.count
     }
 
     /// Monospace anything structural — code, paths, tokens — but keep prose proportional so a

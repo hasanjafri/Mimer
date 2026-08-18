@@ -45,17 +45,37 @@ enum ClipSyntax {
         let lines = text.split(separator: "\n", omittingEmptySubsequences: false)
         guard lines.count >= 2 else { return false }
         if lines[0].hasPrefix("diff --git ") { return true }
-        let hunk = lines.contains { $0.hasPrefix("@@") && $0.dropFirst(2).contains("@@") }
-        // Either marker is enough: plenty of real hunks only add, or only delete.
-        let changes = lines.contains { ($0.hasPrefix("+") || $0.hasPrefix("-")) && !isFileHeader($0) }
-        return hunk && changes
+        let roles = diffRoles(text)
+        return roles.contains(.hunk) && roles.contains { $0 == .added || $0 == .removed }
     }
 
-    /// `--- a/path` / `+++ b/path` are git's file headers; a bare `---` or `+++foo` is a line the
-    /// patch actually adds or removes (a Markdown rule, a YAML marker). The space is what tells
-    /// them apart, so content that merely starts with the marker keeps its colour.
-    static func isFileHeader<S: StringProtocol>(_ line: S) -> Bool {
-        line.hasPrefix("--- ") || line.hasPrefix("+++ ")
+    /// The role of every line in a patch, in order — the one classifier behind diff detection,
+    /// colouring, and the `+12 −3` badge, so those three can never disagree.
+    ///
+    /// `---`/`+++` are file headers only inside a **header block**: after `diff --git`/`index`
+    /// and before that file's first `@@`. Position, not shape, is what separates them from
+    /// identical-looking content (a removed line whose own text began with `-- `).
+    static func diffRoles(_ text: String) -> [Style?] {
+        var roles: [Style?] = []
+        var inHeaderBlock = true      // a patch can open with ---/+++ (plain `diff -u` output)
+        for line in text.split(separator: "\n", omittingEmptySubsequences: false) {
+            if line.hasPrefix("diff ") {
+                inHeaderBlock = true                  // a new file's headers begin
+                roles.append(.meta)
+            } else if line.hasPrefix("@@"), line.dropFirst(2).contains("@@") {
+                inHeaderBlock = false
+                roles.append(.hunk)
+            } else if inHeaderBlock {
+                roles.append(line.isEmpty ? nil : .meta)
+            } else if line.hasPrefix("+") {
+                roles.append(.added)
+            } else if line.hasPrefix("-") {
+                roles.append(.removed)
+            } else {
+                roles.append(nil)
+            }
+        }
+        return roles
     }
 
     static func isJSON(_ text: String) -> Bool {
@@ -117,19 +137,16 @@ enum ClipSyntax {
         }
     }
 
-    /// One span per line, keyed off the leading marker — the shape everyone already reads.
+    /// One span per line, from the shared role classifier — the shape everyone already reads.
     private static func diffSpans(_ text: String) -> [Span] {
         var spans: [Span] = []
         var offset = 0
-        for line in text.split(separator: "\n", omittingEmptySubsequences: false) {
+        let roles = diffRoles(text)
+        for (index, line) in text.split(separator: "\n", omittingEmptySubsequences: false).enumerated() {
             let length = line.count
-            let style: Style?
-            if line.hasPrefix("@@") { style = .hunk }
-            else if isFileHeader(line) || line.hasPrefix("diff ") || line.hasPrefix("index ") { style = .meta }
-            else if line.hasPrefix("+") { style = .added }
-            else if line.hasPrefix("-") { style = .removed }
-            else { style = nil }
-            if let style, length > 0 { spans.append(Span(range: offset..<(offset + length), style: style)) }
+            if let style = roles[index], length > 0 {
+                spans.append(Span(range: offset..<(offset + length), style: style))
+            }
             offset += length + 1        // + the newline
         }
         return spans
