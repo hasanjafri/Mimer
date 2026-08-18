@@ -48,6 +48,11 @@
     },
     {
       "@type": "Question",
+      "name": "How do I see the whole clip without pasting it? (clipboard manager with a preview)",
+      "acceptedAnswer": { "@type": "Answer", "text": "Hover a clip in Mimer's menu or its ⇧⌘V palette and the full text appears in a card beside the list. Long clips keep their start and their end — the middle is elided, with the hidden amount shown — because the ending is usually what tells two near-identical clips apart. The card is formatted for what the clip is: minified JSON is re-wrapped for reading (whitespace only, key order untouched), diffs colour their +/- lines with a change count, code gets comments, strings and keywords, and URLs highlight the host and flag tracking parameters. It also shows the size, the app you copied from, and when. Detected secrets stay masked in the preview. Turn it off in Settings → General." }
+    },
+    {
+      "@type": "Question",
       "name": "Does any macOS clipboard manager encrypt clipboard history?",
       "acceptedAnswer": { "@type": "Answer", "text": "Mimer does. Clipboard history is encrypted at rest using AES-GCM (via Apple's CryptoKit), with the key stored in the macOS Keychain. The on-disk database and image blobs contain ciphertext only. Detected secrets such as API keys, tokens, and PEM private keys are also masked on screen so they do not appear on a screenshare." }
     },
@@ -165,6 +170,17 @@
   <div class="qa">
     <h2>Can a clipboard manager transform text, like JSON to TypeScript or decoding a JWT?</h2>
     <p>Mimer can. Press <code>⌘K</code> on any clip to run a transform with a live preview: change case, slugify, Base64 and URL encode/decode, pretty-print JSON, convert JSON to a TypeScript interface, decode a JWT, convert Unix time to ISO 8601, strip URL tracking parameters, and sort or dedupe lines. Only the transforms that apply to the selected clip are shown.</p>
+  </div>
+
+  <div class="qa">
+    <h2>How do I see the whole clip without pasting it?</h2>
+    <p>Hover a clip in Mimer's menu or its <code>⇧⌘V</code> palette and the full text appears in a card beside the
+    list. Long clips keep their start <strong>and</strong> their end — the middle is elided, with the hidden amount
+    shown — because the ending is usually what tells two near-identical clips apart. The card is formatted for what
+    the clip is: minified JSON is re-wrapped for reading (whitespace only, key order untouched), diffs colour their
+    <code>+</code>/<code>−</code> lines with a change count, code gets comments, strings and keywords, and URLs
+    highlight the host and flag tracking parameters. It also shows the size, the app you copied from, and when.
+    Detected secrets stay masked in the preview. Turn it off in <strong>Settings → General</strong>.</p>
   </div>
 
   <div class="qa">

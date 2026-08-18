@@ -2,7 +2,7 @@
 
 Mimer is a fast, private, **developer-first clipboard manager for macOS**, shipped
 open-source (MIT). It matches Maccy/CopyClip and adds what they lack — type-aware
-clips and ⌘K transforms — for free. **v0.2.2 is live**, auto-updating via Sparkle.
+clips and ⌘K transforms — for free. **v0.4.0 is live**, auto-updating via Sparkle.
 
 - Repo: https://github.com/hasanjafri/Mimer · Tap: https://github.com/hasanjafri/homebrew-tap
 - Install: `brew install --cask hasanjafri/tap/mimer` (or the notarized DMG on the release)
@@ -300,12 +300,19 @@ social card is `swift scripts/make_og.swift docs/media/og.png` (1280×640 @2×, 
 
 ## Status & roadmap
 
-**v0.2.2 shipped** — CI/CD + Sparkle auto-update + a Homebrew tap, all live. Strategy is
+**v0.4.0 shipped** — the **hover preview card** (`ClipInspector`/`ClipPeek`/`ClipSyntax`: a clip
+shown in full beside the list, middle elided rather than the ends, formatted per content type),
+plus an 8 MB text-capture cap and a bounded secret scan. **v0.3.0** shipped the AI-discovery
+layer (`mimer` CLI, opt-in `mimer-mcp` server, both bundled + installable from Settings) and the
+GEO pages. **v0.2.2** shipped CI/CD + Sparkle auto-update + a Homebrew tap. Strategy is
 decided: **wedge-first hybrid** — lead with the transform engine + developer-domain awareness +
 provable privacy; ship images/files/filters as hygiene; defer OCR. Full sequenced plan + risks +
 design invariants in **`docs/ROADMAP.md`**; per-release notes in **`CHANGELOG.md`**. (Cut releases
 with `gh workflow run release.yml -f bump=patch` — it builds/signs/notarizes, makes the GitHub
-release, commits the appcast + version bump, and bumps the tap; then finalize the CHANGELOG.)
+release, commits the appcast + version bump, and bumps the tap. Use `bump=minor` for a release
+with a new user-facing feature. The workflow's notes are `--generate-notes` from merged PRs, so
+the CHANGELOG is **not** an input — finalize it in the PR *before* cutting, and the tagged tree
+is then accurate.)
 
 In v0.2.2 (**roadmap buckets 1–6 all shipped**): secret detection + masking (`SecretDetector`),
 **encrypt history at rest** (`Cryptor`, AES-GCM + Keychain key, lazy migration + vacuum),

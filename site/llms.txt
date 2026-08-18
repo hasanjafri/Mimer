@@ -13,6 +13,7 @@ Key facts:
 What makes it different (the developer wedge):
 
 - Type-aware clips: detects links, code, hex colors, git SHAs, issue keys (ABC-123), and file paths / stack-trace file:line.
+- Hover preview: pause on a clip and it appears in full beside the list, with the middle elided rather than the ends. Formatted for what it is — JSON re-wrapped, diffs coloured with a change count, code tokenised, URLs showing host and tracking parameters — plus size, source app, and time. Secrets stay masked.
 - ⌘K transforms with live preview: case, slugify, Base64/URL, JSON pretty-print, JSON → TypeScript, decode JWT, Unix ↔ ISO time, strip URL tracking params, and more.
 - Scoped search: `type:`, `app:`, `is:fav`, `is:secret`, and `/regex/` filters; plus a paste-stack and ⌘O to open a commit / issue / file:line in your tools.
 

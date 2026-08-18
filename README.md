@@ -12,7 +12,7 @@ it's a fast command palette that understands what you copied and can transform i
   <img src="docs/media/hero.png" alt="Mimer command palette showing type-aware clipboard history" width="640">
 </p>
 
-> Status: **v0.2.2 — live.** Notarized, Homebrew-installable, and auto-updating via
+> Status: **v0.4.0 — live.** Notarized, Homebrew-installable, and auto-updating via
 > Sparkle. **Website:** [mimer.hasanjafri.com](https://mimer.hasanjafri.com/) ·
 > See [CHANGELOG.md](CHANGELOG.md) for what's new and [docs/ROADMAP.md](docs/ROADMAP.md) for what's next.
 
@@ -55,6 +55,11 @@ Free and open source (MIT) — and it stays that way. If you've used **Maccy** o
 
 **Hover preview** — pause on a row (in the menu or the palette) and the whole clip appears
 beside it, read the way it was written:
+
+<p align="center">
+  <img src="docs/media/preview-card.png" alt="Three Mimer hover preview cards: JSON re-wrapped for reading, a diff with coloured +/- lines and a +10 -5 badge, and code with comments, keywords and strings" width="820">
+</p>
+
 
 - long clips elide the **middle**, never the ends — the tail is usually what tells two
   near-identical clips apart;
