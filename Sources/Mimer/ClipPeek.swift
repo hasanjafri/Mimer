@@ -11,6 +11,11 @@ import SwiftUI
 final class ClipPeek {
     static let shared = ClipPeek()
 
+    /// Every timer here runs in `.common` modes, not `.default`: hovering a list puts the run
+    /// loop into event-tracking, where a default-mode timer simply never fires — the card would
+    /// wait for you to stop interacting to appear. Same reason `ClipboardMonitor` polls on
+    /// `.common`.
+    ///
     /// Dwell before a card appears. Hovering is how you *scan* a list, so the card waits until
     /// you have actually settled on a row; once one is up, moving to the next row swaps it
     /// instantly (the standard warm-tooltip behaviour).
@@ -65,10 +70,20 @@ final class ClipPeek {
         // Leave on a short grace: moving between two rows fires exit-then-enter, and AppKit can
         // emit a spurious exit mid-row. A real departure still reads as instant.
         exitGrace?.invalidate()
-        exitGrace = Timer.scheduledTimer(withTimeInterval: 0.12, repeats: false) { _ in
-            MainActor.assumeIsolated { ClipPeek.shared.hide(reason: "hover-exit") }
-        }
+        exitGrace = schedule(after: 0.12, .endHover)
     }
+
+    #if DEBUG
+    /// Headless self-test path: show a card with no pointer and no palette (anchored to the
+    /// screen) so the dwell, the watchdog, and the layout can be verified without a live mouse
+    /// or a window that has to keep focus. Never reachable in a release build.
+    func debugPeek(_ item: ClipItem, action: ClipAction? = nil) {
+        let palette = PaletteController.shared.panelWindow
+        let center = NSScreen.main.map { NSPoint(x: $0.frame.midX, y: $0.frame.midY) } ?? .zero
+        show(item, query: "", action: action, revealed: false, host: palette,
+             anchor: palette == nil ? .pointer(center) : .hostCenter, delay: Self.keyboardDelay)
+    }
+    #endif
 
     func hide(reason: String = "hide") {
         exitGrace?.invalidate(); exitGrace = nil
@@ -101,9 +116,7 @@ final class ClipPeek {
         if isVisible {
             present()          // warm: swap content with no second wait
         } else {
-            dwell = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { _ in
-                MainActor.assumeIsolated { ClipPeek.shared.present() }
-            }
+            dwell = schedule(after: delay, .present)
         }
     }
 
@@ -152,9 +165,7 @@ final class ClipPeek {
     /// entirely. So while a card is up, keep checking that its reason to exist still holds.
     private func startWatchdog() {
         watchdog?.invalidate()
-        watchdog = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { _ in
-            MainActor.assumeIsolated { ClipPeek.shared.checkStillValid() }
-        }
+        watchdog = schedule(after: 0.25, repeats: true, .watchdog)
     }
 
     private func checkStillValid() {
@@ -171,6 +182,24 @@ final class ClipPeek {
 
     /// The window the pointer is over. Prefer the frontmost/most specific one — a menu or panel
     /// sits above (and inside) whatever is behind it.
+    /// What a scheduled tick does. An enum rather than a closure so nothing non-Sendable is
+    /// captured by the timer block.
+    private enum Tick: Sendable { case present, endHover, watchdog }
+
+    private func schedule(after delay: TimeInterval, repeats: Bool = false, _ tick: Tick) -> Timer {
+        let timer = Timer(timeInterval: delay, repeats: repeats) { _ in
+            MainActor.assumeIsolated {
+                switch tick {
+                case .present: ClipPeek.shared.present()
+                case .endHover: ClipPeek.shared.hide(reason: "hover-exit")
+                case .watchdog: ClipPeek.shared.checkStillValid()
+                }
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        return timer
+    }
+
     private func window(under point: NSPoint) -> NSWindow? {
         NSApp.windows
             .filter { $0.isVisible && $0 !== panel && $0.frame.contains(point) }

@@ -77,17 +77,14 @@ final class DebugBridge {
             if parts.count > 1 { ClipStore.shared.addSnippet(parts[1]) }
         case "composer": SnippetComposerWindowController.shared.show()
         case "peek":
-            // Show the hover card for a clip beside the palette — the mouse-driven path isn't
-            // reachable headlessly, so this drives the real panel for a live snapshot.
+            // Show the hover card for a clip — beside the palette if it's open, otherwise
+            // anchored to the screen. The mouse-driven path isn't reachable headlessly.
             if parts.count > 1, let index = Int(parts[1]) {
-                PaletteController.shared.open()
                 let items = ClipStore.shared.snippets + ClipStore.shared.items
                 if items.indices.contains(index) {
                     let item = items[index]
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                        ClipPeek.shared.select(item,
-                                               action: ClipAction.of(item.text, config: Preferences.shared.devConfig))
-                    }
+                    ClipPeek.shared.debugPeek(item,
+                                              action: ClipAction.of(item.text, config: Preferences.shared.devConfig))
                 }
             }
         case "requestpaste": _ = Paster.requestPostEventAccess()   // trigger the macOS PostEvent prompt (E2E harness)
