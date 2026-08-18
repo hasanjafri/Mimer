@@ -68,6 +68,9 @@ Typical loop: edit → `xcodebuild build` → relaunch the Debug app → drive v
 - `ClipboardMonitor` — NSPasteboard changeCount polling (0.5s, **`.common`** runloop so it
   doesn't stall during tracking loops); ignores transient/concealed/auto-generated/
   RestoredType; torn-read re-check guard. Runs on the main thread (timer on RunLoop.main).
+  Text over `maxTextBytes` (8 MB) is skipped, not truncated — same reasoning as the 32 MB image
+  cap, plus text lives decrypted in `ClipStore.items` for the session. An oversized text clip
+  falls through to the image on the same pasteboard rather than shadowing it.
   Captures **text** (preferred) or, when there's no text, an **image** (`onCaptureImage`,
   png/tiff → normalized PNG → `ClipStore.insertImage`).
 - `ClipThumbnail` / `ThumbnailCache` — image-clip rows show a rounded thumbnail, loaded

@@ -6,12 +6,6 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-### Fixed
-- Secret detection now reads a **64 KB window** of a clip instead of all of it. It runs on every
-  row render in the menu and the palette, where a large clip cost ~77 ms per redraw (now ~1 ms).
-  A key at the top of a large file is still masked; only a secret buried past the first 64 KB
-  goes undetected.
-
 ### Added
 - **Hover preview card** — pause on a clip in the menu or the palette and the full clip appears
   in a card beside the list. Long clips keep their start **and** their end (the middle is
@@ -38,6 +32,17 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Strip tracking params** (⌘K) also removes `twclid`, `wickedid`, and `s_kwcid`. The
   preview card's tracking highlighting and this transform now share one list, so the card
   can't flag something ⌘K would keep.
+- Text clips larger than **8 MB** are no longer recorded, mirroring the existing 32 MB image
+  cap. They're skipped rather than truncated (a partial clip would paste as silently corrupted
+  content) and the system clipboard still holds the original, so ⌘V works — it just doesn't
+  enter history, where it would be encrypted on the polling thread and then held decrypted in
+  memory for the rest of the session.
+
+### Fixed
+- Secret detection now reads a **64 KB window** of a clip instead of all of it. It runs on every
+  row render in the menu and the palette, where a large clip cost ~77 ms per redraw (now ~1 ms).
+  A key at the top of a large file is still masked; only a secret buried past the first 64 KB
+  goes undetected.
 
 ## [0.3.0] - 2026-07-27
 
