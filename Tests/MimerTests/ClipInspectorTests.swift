@@ -20,7 +20,7 @@ final class ClipInspectorTests: XCTestCase {
         let preview = ClipInspector.preview("hello world", monospaced: false)
         XCTAssertEqual(preview.head, "hello world")
         XCTAssertEqual(preview.tail, "")
-        XCTAssertEqual(preview.elided, 0)
+        XCTAssertEqual(preview.elision, .none)
         XCTAssertFalse(preview.isElided)
     }
 
@@ -32,7 +32,7 @@ final class ClipInspectorTests: XCTestCase {
         XCTAssertTrue(text.hasPrefix(preview.head), "head must be a real prefix of the clip")
         XCTAssertTrue(text.hasSuffix(preview.tail), "tail must be a real suffix — the end is what disambiguates")
         XCTAssertTrue(preview.tail.hasSuffix("TAIL"))
-        XCTAssertEqual(preview.head.count + preview.tail.count + preview.elided, text.count,
+        XCTAssertEqual(preview.elision, .characters(text.count - preview.head.count - preview.tail.count),
                        "the elided count must account for exactly what is hidden")
     }
 
@@ -53,7 +53,7 @@ final class ClipInspectorTests: XCTestCase {
         let text = (1...10).map { "line \($0)" }.joined(separator: "\n")
         let preview = ClipInspector.preview(text, monospaced: true, charBudget: 5000, lineBudget: 20)
         XCTAssertEqual(preview.head, text)
-        XCTAssertEqual(preview.elided, 0)
+        XCTAssertEqual(preview.elision, .none)
     }
 
     /// Hiding one line behind a "1 more line" marker saves nothing — a little slack over
@@ -62,12 +62,54 @@ final class ClipInspectorTests: XCTestCase {
         let text = (1...21).map { "line \($0)" }.joined(separator: "\n")
         let preview = ClipInspector.preview(text, monospaced: true, charBudget: 5000, lineBudget: 20)
         XCTAssertEqual(preview.head, text)
-        XCTAssertEqual(preview.elided, 0)
+        XCTAssertEqual(preview.elision, .none)
     }
 
     func testTrailingBlankLinesAreTrimmedFromThePreview() {
         let preview = ClipInspector.preview("body\n\n\n", monospaced: false)
         XCTAssertEqual(preview.head, "body")
+    }
+
+    // MARK: - Cost of a hover
+
+    /// A hover must not pay for the whole clip. Above the counting limit the card reports the
+    /// clip's *size* instead of counts it would have to read megabytes to produce — these
+    /// assertions are how we know the cheap path was taken, without timing anything.
+    func testAHugeClipIsMeasuredNotCounted() {
+        let huge = String(repeating: "let value = \"x\"  // note\n", count: 40_000)   // ~1 MB
+        XCTAssertGreaterThan(huge.utf8.count, ClipInspector.countingLimit)
+        let inspector = ClipInspector.make(for: clip(huge, kind: .code), maskSecrets: true, query: "value")
+
+        XCTAssertEqual(inspector.stats.count, 1, "one size, not characters/words/lines")
+        XCTAssertTrue(inspector.stats[0].value.contains("MB") || inspector.stats[0].value.contains("kB"),
+                      "got \(inspector.stats[0].value)")
+        guard case .text(let preview) = inspector.content else { return XCTFail("expected text") }
+        guard case .bytes(let hidden) = preview.elision else {
+            return XCTFail("a clip too big to count reports bytes, not a character count")
+        }
+        XCTAssertGreaterThan(hidden, 0)
+        XCTAssertEqual(preview.hiddenMatches, 0, "scanning the hidden middle is the cost we avoided")
+        XCTAssertFalse(preview.head.isEmpty)
+        XCTAssertFalse(preview.tail.isEmpty, "both ends are still shown")
+    }
+
+    func testAHugeClipKeepsItsStoredKindRatherThanRescanning() {
+        let huge = String(repeating: "https://example.com/x\n", count: 60_000)
+        XCTAssertEqual(ClipInspector.effectiveKind(of: clip(huge)), .text, "no live re-detection at size")
+        XCTAssertEqual(ClipInspector.effectiveKind(of: clip("https://example.com")), .link)
+    }
+
+    func testAHugeDiffSkipsItsTally() {
+        let huge = "@@ -1,2 +1,2 @@\n" + String(repeating: "+added line\n-removed line\n", count: 20_000)
+        XCTAssertNil(ClipInspector.badge(for: huge, format: .diff),
+                     "counting every changed line means reading the whole patch")
+        XCTAssertEqual(ClipInspector.badge(for: "@@ -1 +1 @@\n+a\n-b", format: .diff), "+1 −1")
+    }
+
+    /// Ordinary clips keep exact counts — the limit must not quietly degrade the common case.
+    func testOrdinaryClipsStillGetExactCounts() {
+        let inspector = ClipInspector.make(for: clip("one two\nthree"), maskSecrets: true)
+        XCTAssertEqual(inspector.stats.map(\.label), ["characters", "words", "lines"])
     }
 
     // MARK: - Fragment context
@@ -95,7 +137,7 @@ final class ClipInspectorTests: XCTestCase {
     }
 
     func testTailSpansAreEmptyWithoutATail() {
-        XCTAssertTrue(ClipInspector.tailSpans("whole clip", tail: "", format: .code).isEmpty)
+        XCTAssertTrue(ClipInspector.tailSpans("whole clip"[...], tail: "", format: .code).isEmpty)
     }
 
     /// The head begins where the clip begins, so it needs no context — the model must still
@@ -335,7 +377,8 @@ extension ClipInspectorTests {
         XCTAssertFalse(preview.head.hasSuffix("alph"), "no dangling partial word at the cut")
         XCTAssertTrue(["alpha", "bravo", "charlie"].contains { preview.head.hasSuffix($0) })
         XCTAssertTrue(["alpha", "bravo", "charlie"].contains { preview.tail.hasPrefix($0) })
-        XCTAssertEqual(preview.head.count + preview.tail.count + preview.elided, text.count - 1,
+        XCTAssertEqual(preview.elision,
+                       .characters(text.count - 1 - preview.head.count - preview.tail.count),
                        "the trailing space is trimmed for display; everything else is accounted for")
     }
 }

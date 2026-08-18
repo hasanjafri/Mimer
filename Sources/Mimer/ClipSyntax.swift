@@ -32,10 +32,15 @@ enum ClipSyntax {
 
     // MARK: - Detection
 
+    /// How much of a clip is read to decide what it is. A diff and a JSON document both announce
+    /// themselves at the top, so detection reads a window rather than a megabyte on every hover.
+    static let detectionWindow = 64 * 1024
+
     static func format(for text: String, kind: ClipKind) -> Format {
         if kind == .link { return .url }
-        if looksLikeDiff(text) { return .diff }
-        if isJSON(text) { return .json(reindented: false) }
+        let window = text.utf8.count > detectionWindow ? String(text.prefix(detectionWindow)) : text
+        if looksLikeDiff(window) { return .diff }
+        if isJSON(window) { return .json(reindented: false) }
         if kind == .code { return .code }
         return .plain
     }
@@ -103,8 +108,10 @@ enum ClipSyntax {
     }
 
     static func isJSON(_ text: String) -> Bool {
+        // Size first: trimming allocates a copy of whatever it is handed.
+        guard text.utf8.count <= 100_000 else { return false }
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let first = trimmed.first, first == "{" || first == "[", trimmed.count <= 100_000 else { return false }
+        guard let first = trimmed.first, first == "{" || first == "[" else { return false }
         return (try? JSONSerialization.jsonObject(with: Data(trimmed.utf8))) != nil
     }
 

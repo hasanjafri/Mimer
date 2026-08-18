@@ -25,6 +25,10 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   visible reason for being in the results.
 
 ### Changed
+- Very large clips (over 128 KB) show their **size** in the preview card instead of exact
+  character/word/line counts, and skip the diff tally. Counting a megabyte of text on the main
+  thread to hover one row cost up to ~200 ms; the card now builds in single-digit milliseconds
+  at any clip size.
 - **Strip tracking params** (⌘K) also removes `twclid`, `wickedid`, and `s_kwcid`. The
   preview card's tracking highlighting and this transform now share one list, so the card
   can't flag something ⌘K would keep.

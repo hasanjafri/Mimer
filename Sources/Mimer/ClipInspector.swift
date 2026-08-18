@@ -34,7 +34,7 @@ struct ClipInspector: Equatable, Sendable {
     struct Preview: Equatable, Sendable {
         var head: String
         var tail: String
-        var elided: Int              // characters hidden between head and tail (0 = the whole clip)
+        var elision: Elision         // what sits between head and tail, and in which unit
         var monospaced: Bool
         /// Search matches that fall inside the elided middle. Without this a clip could match
         /// your search entirely in the part the card doesn't show, with nothing to say so.
@@ -43,7 +43,15 @@ struct ClipInspector: Equatable, Sendable {
         /// context rules below are testable and the render path stays layout-only.
         var headSpans: [ClipSyntax.Span] = []
         var tailSpans: [ClipSyntax.Span] = []
-        var isElided: Bool { elided > 0 }
+        var isElided: Bool { elision != .none }
+    }
+
+    /// What the elision marker reports. A clip too large to count without stalling the hover
+    /// reports **bytes** rather than a character count it never measured.
+    enum Elision: Equatable, Sendable {
+        case none
+        case characters(Int)
+        case bytes(Int)
     }
 
     struct Stat: Equatable, Sendable, Identifiable {
@@ -61,6 +69,10 @@ struct ClipInspector: Equatable, Sendable {
     static let structuredLineBudget = 24
     /// Below this much hidden content, showing the clip whole beats eliding it.
     static let elisionSlack = 100
+    /// Above this size, exact character/word/line counts stop being worth their cost: counting
+    /// a megabyte of graphemes on the main thread to hover one row is a visible stall, so such
+    /// clips report their size instead. Measured in UTF-8 bytes, which `String` knows for free.
+    static let countingLimit = 128 * 1024
     /// Ceiling on the hidden-match count. At the ceiling the card says "500+", never a
     /// precise-looking number that is really just the cap.
     static let hiddenMatchCap = 500
@@ -132,7 +144,7 @@ struct ClipInspector: Equatable, Sendable {
     /// after a closing quote would read that quote as an opener and paint the rest as a string.
     /// The lookbehind is bounded so hovering a megabyte-long clip stays cheap; a construct longer
     /// than that degrades to the fragment's own reading, which is where this started.
-    static func tailSpans(_ display: String, tail: String,
+    static func tailSpans(_ display: Substring, tail: String,
                           format: ClipSyntax.Format,
                           lookbehind: Int = ClipInspector.tailLookbehind) -> [ClipSyntax.Span] {
         guard !tail.isEmpty else { return [] }
@@ -146,7 +158,7 @@ struct ClipInspector: Equatable, Sendable {
     /// How many search matches are in the part of the clip the card doesn't show — the head is a
     /// prefix and the tail a suffix of the displayed text, so the middle is what's left.
     static func hiddenMatchCount(in body: String, preview: Preview, query: String) -> Int {
-        guard preview.isElided, !query.isEmpty else { return 0 }
+        guard preview.isElided, !query.isEmpty, body.utf8.count <= countingLimit else { return 0 }
         let display = displayText(body)
         guard display.count > preview.head.count + preview.tail.count else { return 0 }
         let middle = display.dropFirst(preview.head.count).dropLast(preview.tail.count)
@@ -158,7 +170,8 @@ struct ClipInspector: Equatable, Sendable {
     /// Clips captured before type detection existed are stored as `.text`, so detect live for
     /// those — the detail card is where a stale label is most annoying. Mirrors `ClipAction`.
     static func effectiveKind(of item: ClipItem) -> ClipKind {
-        item.kind == .text ? ClipKind.detect(from: item.text) : item.kind
+        guard item.kind == .text, item.text.utf8.count <= countingLimit else { return item.kind }
+        return ClipKind.detect(from: item.text)   // detection scans the clip; not worth it at size
     }
 
     static func title(for kind: ClipKind, format: ClipSyntax.Format = .plain, secretKind: String? = nil) -> String {
@@ -186,6 +199,9 @@ struct ClipInspector: Equatable, Sendable {
         case .json(let reindented):
             return reindented ? "formatted" : nil
         case .diff:
+            // Counting every changed line means reading the whole patch; past the counting limit
+            // the card shows the clip's size instead and skips the tally.
+            guard text.utf8.count <= countingLimit else { return nil }
             let roles = ClipSyntax.diffRoles(text)
             let added = roles.filter { $0 == .added }.count
             let removed = roles.filter { $0 == .removed }.count
@@ -222,9 +238,21 @@ struct ClipInspector: Equatable, Sendable {
                         charBudget: Int = ClipInspector.charBudget,
                         lineBudget: Int = ClipInspector.lineBudget) -> Preview {
         let text = displayText(raw)
+
+        // A clip too big to count is elided by definition — skip straight to the windows rather
+        // than grapheme-count megabytes to find out.
+        if text.utf8.count > countingLimit {
+            let head = limited(text, chars: max(1, charBudget * 2 / 3), lines: max(1, lineBudget - max(1, lineBudget / 3)), fromStart: true)
+            let tail = limited(text, chars: max(1, charBudget / 3), lines: max(1, lineBudget / 3), fromStart: false)
+            let hidden = text.utf8.count - head.utf8.count - tail.utf8.count
+            return Preview(head: head, tail: tail,
+                           elision: hidden > 0 ? .bytes(hidden) : .none,
+                           monospaced: monospaced)
+        }
+
         let lineCount = text.split(separator: "\n", omittingEmptySubsequences: false).count
         guard text.count > charBudget || lineCount > lineBudget else {
-            return Preview(head: text, tail: "", elided: 0, monospaced: monospaced)
+            return Preview(head: String(text), tail: "", elision: .none, monospaced: monospaced)
         }
 
         // Two thirds opening / one third ending: the start identifies the clip, the end
@@ -239,20 +267,24 @@ struct ClipInspector: Equatable, Sendable {
 
         // If the two halves already cover everything, show it whole rather than claim an elision.
         guard head.count + tail.count < text.count else {
-            return Preview(head: text, tail: "", elided: 0, monospaced: monospaced)
+            return Preview(head: String(text), tail: "", elision: .none, monospaced: monospaced)
         }
         // Eliding a sliver costs a marker line and buys nothing — allow a little slack over
         // budget instead, so a 21-line clip in a 20-line budget just shows all 21.
         let hidden = text.count - head.count - tail.count
         if hidden <= Self.elisionSlack, lineCount <= lineBudget + 2 {
-            return Preview(head: text, tail: "", elided: 0, monospaced: monospaced)
+            return Preview(head: String(text), tail: "", elision: .none, monospaced: monospaced)
         }
-        return Preview(head: head, tail: tail, elided: hidden, monospaced: monospaced)
+        return Preview(head: head, tail: tail, elision: .characters(hidden), monospaced: monospaced)
     }
 
     /// The leading (or trailing) slice of `text` within both a line and a character budget.
-    private static func limited(_ text: String, chars: Int, lines: Int, fromStart: Bool) -> String {
-        let parts = text.split(separator: "\n", omittingEmptySubsequences: false)
+    /// Reads only a bounded window from the relevant end: the character budget always dominates,
+    /// so looking at more than a few times that can't change the answer — and on a megabyte-long
+    /// clip, splitting the whole thing into lines is most of the cost of a hover.
+    private static func limited(_ text: Substring, chars: Int, lines: Int, fromStart: Bool) -> String {
+        let window = fromStart ? text.prefix(chars * 3) : text.suffix(chars * 3)
+        let parts = window.split(separator: "\n", omittingEmptySubsequences: false)
         var slice = fromStart
             ? parts.prefix(lines).joined(separator: "\n")
             : parts.suffix(lines).joined(separator: "\n")
@@ -284,14 +316,21 @@ struct ClipInspector: Equatable, Sendable {
     }
 
     /// Trailing blank space is noise in a preview (many clips end with a newline); leading
-    /// indentation is content, so it stays.
-    static func displayText(_ raw: String) -> String {
-        String(raw.reversed().drop(while: \.isWhitespace).reversed())
+    /// indentation is content, so it stays. Returns a slice — building a reversed copy of the
+    /// clip to trim its end was, measurably, the single most expensive step of a hover.
+    static func displayText(_ raw: String) -> Substring {
+        guard let end = raw.lastIndex(where: { !$0.isWhitespace }) else { return "" }
+        return raw[...end]
     }
 
     // MARK: - Stats
 
     static func stats(for text: String) -> [Stat] {
+        // Counting graphemes, words, and lines is three passes over the clip. Past a point that
+        // is a stall on hover for numbers nobody reads precisely — report the size instead.
+        if text.utf8.count > countingLimit {
+            return [Stat(value: text.utf8.count.formatted(.byteCount(style: .file)), label: "")]
+        }
         let chars = text.count
         let words = text.split(whereSeparator: \.isWhitespace).count
         let lines = text.split(separator: "\n", omittingEmptySubsequences: false).count

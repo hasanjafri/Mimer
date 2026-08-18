@@ -99,7 +99,7 @@ struct ClipInspectorCard: View {
         VStack(alignment: .leading, spacing: 10) {
             body(preview.head, monospaced: preview.monospaced, spans: preview.headSpans)
             if preview.isElided {
-                elisionMarker(preview.elided, hiddenMatches: preview.hiddenMatches)
+                elisionMarker(preview.elision, hiddenMatches: preview.hiddenMatches)
                 body(preview.tail, monospaced: preview.monospaced, spans: preview.tailSpans)
             }
         }
@@ -119,16 +119,26 @@ struct ClipInspectorCard: View {
 
     /// The elided middle, called out rather than hidden — you should always know how much of
     /// the clip you are not looking at.
-    private func elisionMarker(_ count: Int, hiddenMatches: Int) -> some View {
+    private func elisionMarker(_ elision: ClipInspector.Elision, hiddenMatches: Int) -> some View {
         HStack(spacing: 8) {
             rule
             Text(hiddenMatches > 0
-                 ? "\(count.formatted()) more characters · \(hiddenMatchLabel(hiddenMatches)) hidden"
-                 : "\(count.formatted()) more characters")
+                 ? "\(elisionLabel(elision)) · \(hiddenMatchLabel(hiddenMatches)) hidden"
+                 : elisionLabel(elision))
                 .font(.caption2.monospacedDigit())
                 .foregroundStyle(.tertiary)
                 .fixedSize()
             rule
+        }
+    }
+
+    /// A clip too large to count reports what was measured — its size — not a character count
+    /// nobody counted.
+    private func elisionLabel(_ elision: ClipInspector.Elision) -> String {
+        switch elision {
+        case .none: return ""
+        case .characters(let count): return "\(count.formatted()) more characters"
+        case .bytes(let bytes): return "\(bytes.formatted(.byteCount(style: .file))) more"
         }
     }
 
@@ -365,6 +375,7 @@ private enum AppIconLookup {
 
     static func icon(forLocalizedName name: String) -> NSImage? {
         if let hit = cache[name] { return hit }
+        if cache.count >= 64 { cache.removeAll() }   // one entry per app seen; never unbounded
         let icon = NSWorkspace.shared.runningApplications
             .first { $0.localizedName == name }
             .flatMap(\.icon)

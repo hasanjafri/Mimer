@@ -196,6 +196,13 @@ Typical loop: edit → `xcodebuild build` → relaunch the Debug app → drive v
   ⌘O hint) — long clips drop the **middle**, never the tail, because the ending is what separates
   near-identical clips; cuts land on word boundaries; a masked secret stays masked (the card must
   not re-open the hole row masking closes) and is never lexed. `ClipInspectorCard` is layout only.
+  **Cost discipline:** a hover must never pay for the whole clip. `displayText` returns a slice
+  (building a reversed copy to trim the end was the most expensive step of a hover, even at 16 KB);
+  head/tail come from bounded windows; and past `countingLimit` (128 KB) the card reports the
+  clip's **size** rather than counts that require reading it all — exact stats, hidden-match
+  counts, live kind re-detection, and the diff tally are all skipped there. Measured: building a
+  card for a 1 MB clip went 765 ms → 23 ms, a 5 MB clip 3.8 s → 97 ms. The remaining cost at that
+  size is `SecretDetector`, which scans the full text (pre-existing, and also runs per row render).
   `ClipPeek` owns *when and where*: a 0.4s hover dwell (0.55s for keyboard selection, which anchors
   beside the palette instead of the pointer), warm swaps with no second wait, a 0.12s exit grace,
   and a **watchdog** that re-checks the reason to exist every 0.25s — AppKit does not reliably
