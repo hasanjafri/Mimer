@@ -46,3 +46,39 @@ final class SecretDetectorTests: XCTestCase {
         XCTAssertNil(SecretDetector.maskedPreview("hello world"))
     }
 }
+
+/// Detection is bounded: it runs on every row render, so it reads a window rather than the
+/// whole clip. A key at the top of a large file is still masked; one buried past the window
+/// is the accepted cost.
+extension SecretDetectorTests {
+    func testAKeyAtTheTopOfALargeDocumentIsStillDetected() {
+        let pem = "-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA\n-----END RSA PRIVATE KEY-----\n"
+        let big = pem + String(repeating: "filler line of an otherwise ordinary file\n", count: 200_000)
+        XCTAssertGreaterThan(big.utf8.count, SecretDetector.scanLimit)
+        XCTAssertEqual(SecretDetector.kind(of: big), "Private key")
+    }
+
+    func testASecretBuriedPastTheWindowIsNotDetected() {
+        let filler = String(repeating: "ordinary text that is not a secret at all\n", count: 200_000)
+        let buried = filler + "-----BEGIN RSA PRIVATE KEY-----\nx\n-----END RSA PRIVATE KEY-----"
+        XCTAssertNil(SecretDetector.kind(of: buried),
+                     "documented tradeoff: scanning megabytes on every row render costs more")
+    }
+
+    func testOrdinarySecretsAreUnaffectedByTheWindow() {
+        XCTAssertEqual(SecretDetector.kind(of: "AKIAIOSFODNN7EXAMPLE"), "AWS key")
+        XCTAssertEqual(SecretDetector.maskedPreview("AKIAIOSFODNN7EXAMPLE"), "AWS key ••••MPLE")
+        XCTAssertEqual(SecretDetector.maskedPreview("ghp_" + String(repeating: "a", count: 32) + "WXYZ"),
+                       "GitHub token ••••WXYZ")
+    }
+
+    /// The last-4 hint comes from the real end of the clip, not the end of the scan window.
+    func testLastFourComesFromTheRealEndOfAHugeToken() {
+        let token = "sk-" + String(repeating: "a", count: SecretDetector.scanLimit) + "TAIL"
+        XCTAssertEqual(SecretDetector.maskedPreview(token), "API key ••••TAIL")
+    }
+
+    func testTrailingWhitespaceDoesNotBecomeTheHint() {
+        XCTAssertEqual(SecretDetector.maskedPreview("AKIAIOSFODNN7EXAMPLE\n"), "AWS key ••••MPLE")
+    }
+}
