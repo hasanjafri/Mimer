@@ -71,6 +71,7 @@ final class PaletteController: NSObject {
     func dismiss(paste text: String?) {
         guard !isDismissing else { return }
         isDismissing = true
+        ClipPeek.shared.hide(reason: "palette-dismiss")
 
         panel?.delegate = nil          // avoid a dangling delegate / re-entrant resign during teardown
         panel?.orderOut(nil)
@@ -86,6 +87,7 @@ final class PaletteController: NSObject {
     func dismiss(pasteImage data: Data) {
         guard !isDismissing else { return }
         isDismissing = true
+        ClipPeek.shared.hide(reason: "palette-dismiss")
         panel?.delegate = nil
         panel?.orderOut(nil)
         panel = nil
@@ -139,6 +141,7 @@ final class PaletteController: NSObject {
         guard !isDismissing else { return }
         guard items.count > 1 else { dismiss(paste: items.first); return }   // 0/1 → normal path
         isDismissing = true
+        ClipPeek.shared.hide(reason: "palette-dismiss")
         panel?.delegate = nil
         panel?.orderOut(nil)
         panel = nil
@@ -177,6 +180,8 @@ final class PaletteController: NSObject {
 
     // Introspection (used by the debug bridge).
     var isPaletteVisible: Bool { panel?.isVisible ?? false }
+    /// The live panel — the hover card anchors itself to this when the selection moves by keyboard.
+    var panelWindow: NSWindow? { panel }
     var isPaletteKey: Bool { panel?.isKeyWindow ?? false }
     var firstResponderDescription: String {
         guard let fr = panel?.firstResponder else { return "nil" }

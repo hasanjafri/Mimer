@@ -1,6 +1,15 @@
 import SwiftUI
 import AppKit
 import ImageIO
+import UniformTypeIdentifiers
+
+/// What an image blob says about itself — shown in the hover preview card.
+struct ImageBlobInfo: Sendable, Equatable {
+    var pixelWidth: Int?
+    var pixelHeight: Int?
+    var byteCount: Int
+    var type: String?      // "PNG", "TIFF", …
+}
 
 /// In-memory thumbnail cache for image clips, keyed by blob hash. Decrypts the blob (on the
 /// main actor — a fast file read) then downsamples **off the main actor** via ImageIO, returning
@@ -9,8 +18,14 @@ import ImageIO
 final class ThumbnailCache {
     static let shared = ThumbnailCache()
     private let cache = NSCache<NSString, NSImage>()
+    private var infos: [String: ImageBlobInfo] = [:]
 
-    init() { cache.countLimit = 256 }
+    // The preview card asks for much larger thumbnails than a row does, so bound by bytes as
+    // well as by count — 256 full-size previews would be hundreds of megabytes.
+    init() {
+        cache.countLimit = 256
+        cache.totalCostLimit = 48 * 1024 * 1024
+    }
 
     func thumbnail(for hash: String, maxPixel: CGFloat = 64) async -> NSImage? {
         let key = "\(hash)@\(Int(maxPixel))" as NSString
@@ -20,8 +35,44 @@ final class ThumbnailCache {
             Self.downsample(data, maxPixel: maxPixel)            // ImageIO decode/resize off-main
         }).value else { return nil }
         let image = NSImage(cgImage: cg, size: NSSize(width: cg.width, height: cg.height))
-        cache.setObject(image, forKey: key)
+        cache.setObject(image, forKey: key, cost: cg.width * cg.height * 4)
         return image
+    }
+
+    /// The preview card's image **and** its metadata from a single load: reading the blob twice
+    /// would decrypt and re-read every byte of a large image for the sake of a size label.
+    func preview(for hash: String, maxPixel: CGFloat) async -> (image: NSImage?, info: ImageBlobInfo?) {
+        let key = "\(hash)@\(Int(maxPixel))" as NSString
+        if let image = cache.object(forKey: key), let info = infos[hash] { return (image, info) }
+        guard let data = ClipStore.shared.blobData(hash) else { return (nil, nil) }
+
+        let decoded = await Task.detached(priority: .userInitiated, operation: {
+            (Self.downsample(data, maxPixel: maxPixel), Self.readInfo(data))
+        }).value
+
+        var image: NSImage?
+        if let cg = decoded.0 {
+            image = NSImage(cgImage: cg, size: NSSize(width: cg.width, height: cg.height))
+            cache.setObject(image!, forKey: key, cost: cg.width * cg.height * 4)
+        }
+        if infos.count >= 512 { infos.removeAll() }   // tiny records, but never unbounded
+        infos[hash] = decoded.1
+        return (image, decoded.1)
+    }
+
+    private nonisolated static func readInfo(_ data: Data) -> ImageBlobInfo {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else {
+            return ImageBlobInfo(pixelWidth: nil, pixelHeight: nil, byteCount: data.count, type: nil)
+        }
+        let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
+        let type = CGImageSourceGetType(source)
+            .flatMap { UTType($0 as String)?.preferredFilenameExtension?.uppercased() }
+        return ImageBlobInfo(
+            pixelWidth: props?[kCGImagePropertyPixelWidth] as? Int,
+            pixelHeight: props?[kCGImagePropertyPixelHeight] as? Int,
+            byteCount: data.count,
+            type: type
+        )
     }
 
     /// Returns a Sendable CGImage so the heavy decode can cross the actor boundary safely.

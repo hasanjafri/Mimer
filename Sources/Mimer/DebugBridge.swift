@@ -8,7 +8,8 @@ import SwiftUI
 /// executes commands written to `_debug_cmd`. Never compiled into release builds.
 ///
 /// Commands (write one to _debug_cmd): `open`, `close`, `paste <i>`, `settings`,
-/// `fav <i>`, `delete <i>`, `pause`, `resume`, `snapshot`, `requestpaste` (prompt for PostEvent).
+/// `fav <i>`, `delete <i>`, `pause`, `resume`, `snapshot`, `peek <i>` (hover card for a clip),
+/// `requestpaste` (prompt for PostEvent).
 /// `snapshot` renders Mimer's own windows to PNGs in `_snapshots/` (no Screen
 /// Recording permission needed — the app draws itself). Inject clips for capture
 /// testing from the shell with `pbcopy` (no bridge needed).
@@ -75,6 +76,17 @@ final class DebugBridge {
         case "snippet":
             if parts.count > 1 { ClipStore.shared.addSnippet(parts[1]) }
         case "composer": SnippetComposerWindowController.shared.show()
+        case "peek":
+            // Show the hover card for a clip — beside the palette if it's open, otherwise
+            // anchored to the screen. The mouse-driven path isn't reachable headlessly.
+            if parts.count > 1, let index = Int(parts[1]) {
+                let items = ClipStore.shared.snippets + ClipStore.shared.items
+                if items.indices.contains(index) {
+                    let item = items[index]
+                    ClipPeek.shared.debugPeek(item,
+                                              action: ClipAction.of(item.text, config: Preferences.shared.devConfig))
+                }
+            }
         case "requestpaste": _ = Paster.requestPostEventAccess()   // trigger the macOS PostEvent prompt (E2E harness)
         default: break
         }
@@ -118,6 +130,32 @@ final class DebugBridge {
                         debugHoverID: menuItems.count > 1 ? menuItems[1].id : nil),
             width: 320), "render-menu-feedback.png")
         write(renderPNG(PaletteView(onPaste: { _ in }, onClose: {}), width: 640), "render-palette.png")
+        // Hover cards: the newest real clip, plus a synthetic long one so the middle-elision
+        // treatment is always in the snapshot set even when the history has no long clips.
+        if let first = menuItems.first {
+            // Masking is forced on for the render, not read from the preference: these PNGs sit
+            // on disk until the next snapshot, and a debug artifact must never be the thing that
+            // writes a plaintext secret to a file.
+            write(renderPNG(ClipInspectorCard(inspector: ClipInspector.make(for: first,
+                                                                           maskSecrets: true,
+                                                                           action: ClipAction.of(first.text, config: Preferences.shared.devConfig))),
+                            width: ClipInspectorCard.width), "render-peek.png")
+        }
+        write(renderPNG(ClipInspectorCard(inspector: ClipInspector.make(for: Self.longSampleClip,
+                                                                       maskSecrets: true,
+                                                                       query: "shipping")),
+                        width: ClipInspectorCard.width), "render-peek-long.png")
+        // One sheet of every content treatment, for design review of the card.
+        write(renderPNG(
+            HStack(alignment: .top, spacing: 12) {
+                ForEach(Array(Self.formatSampleClips.enumerated()), id: \.offset) { _, sample in
+                    ClipInspectorCard(inspector: ClipInspector.make(for: sample,
+                                                                    maskSecrets: true,
+                                                                    action: ClipAction.of(sample.text)))
+                }
+            }.padding(12),
+            width: CGFloat(Self.formatSampleClips.count) * (ClipInspectorCard.width + 12) + 12
+        ), "render-peek-formats.png")
         write(renderPNG(OnboardingView(onDone: {}), width: 440), "render-onboarding.png")
 
         // Plus whatever live windows are on screen (real material/vibrancy).
@@ -131,6 +169,79 @@ final class DebugBridge {
         NSLog("Mimer snapshot → \(snapDir.path)")
     }
 
+    /// A long, multi-line clip for the snapshot harness: exercises middle elision, the line
+    /// counts, and search highlighting in one render.
+    private static let longSampleClip = ClipItem(
+        id: UUID(),
+        text: (1...40).map { "\($0). shipping notes — the middle of a long clip is exactly what a truncated row hides" }
+            .joined(separator: "\n"),
+        kind: .text,
+        createdAt: Date().addingTimeInterval(-3600),
+        isFavorite: true,
+        sourceApp: "Xcode"
+    )
+
+    /// One clip per content treatment (JSON · diff · code · tracked URL · secret) so the
+    /// snapshot sheet always shows every path the card can take.
+    private static let formatSampleClips: [ClipItem] = [
+        sample(#"{"id":42,"name":"Ada Lovelace","roles":["admin","owner"],"active":true,"meta":{"seen":null,"score":9.75}}"#,
+               app: "Terminal"),
+        sample("""
+            diff --git a/Sources/Mimer/ClipPeek.swift b/Sources/Mimer/ClipPeek.swift
+            index 1111111..2222222 100644
+            --- a/Sources/Mimer/ClipPeek.swift
+            +++ b/Sources/Mimer/ClipPeek.swift
+            @@ -42,7 +42,9 @@ final class ClipPeek {
+                 func hover(_ item: ClipItem) {
+            -        show(item, delay: 0.2)
+            -        watchdog.start()
+            +        show(item, delay: Self.hoverDelay)
+            +        // the pointer owns this card now
+            +        watchdog.start(anchoredToPointer: true)
+                 }
+
+            @@ -84,10 +86,14 @@ final class ClipPeek {
+                 private func present() {
+            -        guard let pending else { return }
+            +        guard let pending, Preferences.shared.maskSecrets == maskedWhenShown else { return }
+                     let panel = self.panel ?? ClipPeekPanel()
+            -        panel.contentView = NSHostingView(rootView: pending.card)
+            +        let hosting = NSHostingView(rootView: pending.card)
+            +        panel.contentView = hosting
+            +        hosting.layoutSubtreeIfNeeded()
+                     panel.orderFrontRegardless()
+                 }
+
+            @@ -120,6 +126,9 @@ final class ClipPeek {
+                 private func checkStillValid() {
+            -        guard let host, host.isVisible else { hide(); return }
+            +        guard let host else { return pointerDrifted() ? hide() : () }
+            +        guard host.isVisible else { hide(reason: "host-gone"); return }
+            +        if anchoredToPointer, !host.frame.contains(NSEvent.mouseLocation) { hide() }
+                 }
+            """, app: "Xcode"),
+        sample("""
+            // keep the newest capture on top
+            func insert(text: String) -> Bool {
+                guard !text.isEmpty else { return false }
+                let hash = cryptor.dedupeHash(text)   /* keyed, never raw */
+                SELECT id FROM clips WHERE content_hash = hash LIMIT 1
+                return store.save(text, hash: hash, limit: 200)
+            }
+            """, kind: .code, app: "Cursor"),
+        sample("https://mimer.hasanjafri.com/compare?utm_source=newsletter&utm_campaign=launch&plan=pro&fbclid=IwAR2x9",
+               kind: .link, app: "Safari"),
+        sample("AKIAIOSFODNN7EXAMPLE", app: "1Password"),
+        // Past the counting limit: the card reports size, not counts it never read.
+        sample(String(repeating: "2026-08-18 14:02:11 INFO  request served in 12ms  path=/api/clips\n",
+                      count: 20_000), app: "Console")
+    ]
+
+    private static func sample(_ text: String, kind: ClipKind = .text, app: String) -> ClipItem {
+        ClipItem(id: UUID(), text: text, kind: kind, createdAt: Date().addingTimeInterval(-900),
+                 isFavorite: false, sourceApp: app)
+    }
+
     private func writeState() {
         // Never write a raw secret to the debug state file (it's plaintext on disk).
         let redact: (String) -> String = { SecretDetector.maskedPreview($0) ?? $0 }
@@ -141,6 +252,15 @@ final class DebugBridge {
             "canPostEvents": Paster.canPostEvents,
             "settingsVisible": SettingsWindowController.shared.isVisible,
             "isPaused": Preferences.shared.isPaused,
+            "paletteFrame": PaletteController.shared.panelWindow.map {
+                ["x": $0.frame.minX, "y": $0.frame.minY, "w": $0.frame.width, "h": $0.frame.height]
+            } ?? [:],
+            "windows": NSApp.windows.filter(\.isVisible).map {
+                ["class": String(describing: type(of: $0)), "level": $0.level.rawValue,
+                 "x": $0.frame.minX, "y": $0.frame.minY, "w": $0.frame.width, "h": $0.frame.height]
+            },
+            "peekVisible": ClipPeek.shared.isVisible,
+            "peekLog": ClipPeek.shared.eventLog,
             "clipCount": ClipStore.shared.items.count,
             "clips": Array(ClipStore.shared.items.prefix(10).map { redact($0.text) }),
             "favorites": ClipStore.shared.items.filter(\.isFavorite).map { redact($0.text) }

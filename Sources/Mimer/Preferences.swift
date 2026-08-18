@@ -38,6 +38,12 @@ final class Preferences: ObservableObject {
         didSet { defaults.set(maskSecrets, forKey: Keys.maskSecrets) }
     }
 
+    /// Show the hover preview card over a clip row (menu + palette). On by default — it's the
+    /// only way to read the middle of a long clip without pasting it somewhere.
+    @Published var previewOnHover: Bool {
+        didSet { defaults.set(previewOnHover, forKey: Keys.previewOnHover) }
+    }
+
     /// Opt-in: expose clip history to local AI tools via the `mimer-mcp` server. **Default off** —
     /// while off the app registers no IPC port, so an MCP client can read nothing. See `MCPBridge`.
     @Published var mcpEnabled: Bool {
@@ -76,6 +82,7 @@ final class Preferences: ObservableObject {
         static let isPaused = "isPaused"
         static let excludedBundleIDs = "excludedBundleIDs"
         static let maskSecrets = "maskSecrets"
+        static let previewOnHover = "previewOnHover"
         static let mcpEnabled = "mcpEnabled"
         static let gitRemoteBase = "gitRemoteBase"
         static let issueTrackerTemplate = "issueTrackerTemplate"
@@ -89,6 +96,7 @@ final class Preferences: ObservableObject {
         isPaused = defaults.bool(forKey: Keys.isPaused)
         excludedBundleIDs = Set(defaults.stringArray(forKey: Keys.excludedBundleIDs) ?? [])
         maskSecrets = defaults.object(forKey: Keys.maskSecrets) as? Bool ?? true   // default on
+        previewOnHover = defaults.object(forKey: Keys.previewOnHover) as? Bool ?? true   // default on
         mcpEnabled = defaults.bool(forKey: Keys.mcpEnabled)   // default off (bool defaults to false)
         gitRemoteBase = defaults.string(forKey: Keys.gitRemoteBase) ?? ""
         issueTrackerTemplate = defaults.string(forKey: Keys.issueTrackerTemplate) ?? ""

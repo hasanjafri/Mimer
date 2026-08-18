@@ -1,0 +1,378 @@
+import Foundation
+
+/// Content-aware styling for the preview body: the card shows a diff as a diff, JSON as JSON,
+/// and a URL with its host picked out — because *what* a clip is, is half of telling two clips
+/// apart. Pure and offset-based (character offsets, not String.Index) so it is trivially
+/// testable and cheap to paint.
+///
+/// Deliberately a lexer, not a parser: it never rewrites the clip (the one exception is
+/// re-indenting minified JSON, which is a whitespace-only pass over the same tokens and is
+/// labelled "formatted" in the card). What you see is what you paste.
+enum ClipSyntax {
+
+    /// How a clip's body should be read. Detected from the text, not from the stored kind.
+    enum Format: Equatable, Sendable {
+        case plain
+        case code
+        case json(reindented: Bool)
+        case diff
+        case url
+    }
+
+    enum Style: Equatable, Sendable {
+        case plain, comment, string, number, keyword, jsonKey
+        case added, removed, hunk, meta
+        case host, tracking
+    }
+
+    struct Span: Equatable, Sendable {
+        var range: Range<Int>       // character offsets into the previewed text
+        var style: Style
+    }
+
+    // MARK: - Detection
+
+    /// How much of a clip is read to decide what it is. A diff and a JSON document both announce
+    /// themselves at the top, so detection reads a window rather than a megabyte on every hover.
+    static let detectionWindow = 64 * 1024
+
+    static func format(for text: String, kind: ClipKind) -> Format {
+        if kind == .link { return .url }
+        let window = text.utf8.count > detectionWindow ? String(text.prefix(detectionWindow)) : text
+        if looksLikeDiff(window) { return .diff }
+        if isJSON(window) { return .json(reindented: false) }
+        if kind == .code { return .code }
+        return .plain
+    }
+
+    /// A unified diff / patch: hunk headers plus +/- lines, or git's own header.
+    static func looksLikeDiff(_ text: String) -> Bool {
+        let lines = text.split(separator: "\n", omittingEmptySubsequences: false)
+        guard lines.count >= 2 else { return false }
+        if lines[0].hasPrefix("diff --git ") { return true }
+        guard lines.contains(where: isHunkHeader) else { return false }   // whole clips need a hunk header
+        let roles = diffRoles(text)
+        return roles.contains { $0 == .added || $0 == .removed }
+    }
+
+    /// The role of every line in a patch, in order — the one classifier behind diff detection,
+    /// colouring, and the `+12 −3` badge, so those three can never disagree.
+    ///
+    /// `---`/`+++` are file headers only inside a **header block**: after `diff --git`/`index`
+    /// and before that file's first `@@`. Position, not shape, is what separates them from
+    /// identical-looking content (a removed line whose own text began with `-- `).
+    static func diffRoles(_ text: String) -> [Style?] {
+        let lines = text.split(separator: "\n", omittingEmptySubsequences: false)
+
+        // The card lexes the previewed head and tail separately, so this is often a *fragment* of
+        // a patch, with no context before its first line. Only that first line can say whether we
+        // begin inside a header block — a hunk header *later* in the fragment says nothing about
+        // the change lines before it, which belong to the previous hunk.
+        var inHeaderBlock = lines.first.map(opensHeaderBlock) == true
+
+        var roles: [Style?] = []
+        for line in lines {
+            if line.hasPrefix("diff ") {
+                inHeaderBlock = true                  // a new file's headers begin
+                roles.append(.meta)
+            } else if isHunkHeader(line) {
+                inHeaderBlock = false
+                roles.append(.hunk)
+            } else if inHeaderBlock {
+                roles.append(line.isEmpty ? nil : .meta)
+            } else if line.hasPrefix("+") {
+                roles.append(.added)
+            } else if line.hasPrefix("-") {
+                roles.append(.removed)
+            } else {
+                roles.append(nil)
+            }
+        }
+        return roles
+    }
+
+    static func isHunkHeader<S: StringProtocol>(_ line: S) -> Bool {
+        line.hasPrefix("@@") && line.dropFirst(2).contains("@@")
+    }
+
+    /// Whether a line begins a file's header block. Used only for the *first* line of a fragment,
+    /// where there is no position to reason from — everywhere else, position decides. `--- `/`+++ `
+    /// with the space is git's own header form; `+++foo` is content.
+    static func opensHeaderBlock<S: StringProtocol>(_ line: S) -> Bool {
+        for prefix in ["diff ", "index ", "--- ", "+++ ", "old mode ", "new mode ",
+                       "new file mode ", "deleted file mode ", "similarity index ",
+                       "rename ", "copy ", "Binary files "] where line.hasPrefix(prefix) {
+            return true
+        }
+        return false
+    }
+
+    static func isJSON(_ text: String) -> Bool {
+        // Size first: trimming allocates a copy of whatever it is handed.
+        guard text.utf8.count <= 100_000 else { return false }
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let first = trimmed.first, first == "{" || first == "[" else { return false }
+        return (try? JSONSerialization.jsonObject(with: Data(trimmed.utf8))) != nil
+    }
+
+    /// Re-indent minified JSON. A whitespace-only pass over the same characters — key order and
+    /// every value survive byte-for-byte, unlike a decode/re-encode round trip. nil when the
+    /// clip isn't minified JSON (already-formatted JSON is left exactly as it is).
+    static func reindentJSON(_ text: String, indent: String = "  ") -> String? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard isJSON(trimmed), !trimmed.contains("\n"), trimmed.count <= 20_000 else { return nil }
+
+        var out = ""
+        var depth = 0
+        var inString = false
+        var escaped = false
+
+        func newline(_ level: Int) {
+            out.append("\n")
+            out.append(String(repeating: indent, count: max(0, level)))
+        }
+
+        for character in trimmed {
+            if inString {
+                out.append(character)
+                if escaped { escaped = false }
+                else if character == "\\" { escaped = true }
+                else if character == "\"" { inString = false }
+                continue
+            }
+            switch character {
+            case "\"": inString = true; out.append(character)
+            case "{", "[": depth += 1; out.append(character); newline(depth)
+            case "}", "]": depth -= 1; newline(depth); out.append(character)
+            case ",": out.append(character); newline(depth)
+            case ":": out.append(character); out.append(" ")
+            case " ", "\t", "\n": break            // token separators are rebuilt, not preserved
+            default: out.append(character)
+            }
+        }
+        // Empty containers read better closed up than spread over three lines.
+        for pattern in [#"\{\n\s*\}"#: "{}", #"\[\n\s*\]"#: "[]"] {
+            out = out.replacingOccurrences(of: pattern.key, with: pattern.value, options: .regularExpression)
+        }
+        return out
+    }
+
+    // MARK: - Spans
+
+    /// Clip spans to `range` and rebase them to start at 0 — how a lexed *window* becomes spans
+    /// for the slice the card actually shows.
+    static func rebase(_ spans: [Span], to range: Range<Int>) -> [Span] {
+        spans.compactMap { span in
+            let lower = max(span.range.lowerBound, range.lowerBound)
+            let upper = min(span.range.upperBound, range.upperBound)
+            guard lower < upper else { return nil }
+            return Span(range: (lower - range.lowerBound)..<(upper - range.lowerBound), style: span.style)
+        }
+    }
+
+    static func spans(for text: String, format: Format) -> [Span] {
+        switch format {
+        case .plain: return []
+        case .diff: return diffSpans(text)
+        case .url: return urlSpans(text)
+        case .code, .json: return codeSpans(text)
+        }
+    }
+
+    /// One span per line, from the shared role classifier — the shape everyone already reads.
+    private static func diffSpans(_ text: String) -> [Span] {
+        var spans: [Span] = []
+        var offset = 0
+        let roles = diffRoles(text)
+        for (index, line) in text.split(separator: "\n", omittingEmptySubsequences: false).enumerated() {
+            let length = line.count
+            if let style = roles[index], length > 0 {
+                spans.append(Span(range: offset..<(offset + length), style: style))
+            }
+            offset += length + 1        // + the newline
+        }
+        return spans
+    }
+
+    /// Scheme dimmed, host emphasised, and tracking parameters called out — the parts that
+    /// actually distinguish two long URLs from each other. Runs on each previewed segment
+    /// independently, so it also has to cope with the *tail* of an elided URL: a bare
+    /// `…&utm_campaign=launch&plan=pro` slice with no scheme and no `?` of its own.
+    private static func urlSpans(_ text: String) -> [Span] {
+        let c = Array(text)
+        var spans: [Span] = []
+        var cursor = 0
+        var sawScheme = false
+
+        if let schemeEnd = indexOf("://", in: c, from: 0) {
+            spans.append(Span(range: 0..<(schemeEnd + 3), style: .meta))
+            cursor = schemeEnd + 3
+            sawScheme = true
+        }
+
+        // A fragment is not part of the query, and never tracking.
+        let end = indexOf("#", in: c, from: cursor) ?? c.count
+        let question = indexOf("?", in: c, from: cursor).flatMap { $0 < end ? $0 : nil }
+
+        var foundHost = false
+        let hostEnd = [indexOf("/", in: c, from: cursor), question, end].compactMap { $0 }.min() ?? c.count
+        if hostEnd > cursor {
+            let candidate = String(c[cursor..<hostEnd])
+            if sawScheme || looksLikeHost(candidate) {
+                spans.append(Span(range: cursor..<hostEnd, style: .host))
+                foundHost = true
+            }
+        }
+
+        let paramsStart: Int
+        if let question {
+            paramsStart = question + 1
+        } else if !foundHost, looksLikeQuery(String(c[cursor..<end])) {
+            paramsStart = cursor                     // the previewed tail of a long URL
+        } else {
+            return spans
+        }
+        guard paramsStart < end else { return spans }
+
+        spans.append(Span(range: paramsStart..<end, style: .meta))
+        var start = paramsStart
+        while start < end {
+            let next = indexOf("&", in: c, from: start).flatMap { $0 < end ? $0 : nil } ?? end
+            let raw = String(c[start..<next]).split(separator: "=", maxSplits: 1).first.map(String.init) ?? ""
+            // ⌘K sees decoded names (URLComponents decodes them), so decode here too or the
+            // card would disagree with the transform on `utm%5Fsource`.
+            let name = raw.removingPercentEncoding ?? raw
+            if isTrackingParameter(name) { spans.append(Span(range: start..<next, style: .tracking)) }
+            start = next + 1
+        }
+        return spans
+    }
+
+    /// `example.com`, `sub.example.co.uk:8080` — but not `utm_campaign=launch&plan=pro`, which is
+    /// what a previewed URL tail looks like.
+    static func looksLikeHost(_ s: String) -> Bool {
+        guard s.contains("."), !s.contains("="), !s.contains("&") else { return false }
+        return s.allSatisfy { $0.isLetter || $0.isNumber || "-._:".contains($0) }
+    }
+
+    static func looksLikeQuery(_ s: String) -> Bool { s.contains("=") && !s.contains(where: \.isWhitespace) }
+
+    /// One source of truth with the ⌘K "Strip tracking params" transform — the card must not flag
+    /// something the transform would keep, or vice versa.
+    static func isTrackingParameter(_ name: String) -> Bool {
+        ClipTransform.isTrackingParameter(name)
+    }
+
+    /// A small, language-agnostic lexer: comments, strings, numbers, keywords, and JSON keys.
+    /// Wrong-language keywords are simply not highlighted — never mis-highlighted — because the
+    /// only thing worse than no colour is colour that lies about what the code says.
+    private static func codeSpans(_ text: String) -> [Span] {
+        let c = Array(text)
+        var spans: [Span] = []
+        var i = 0
+
+        while i < c.count {
+            let ch = c[i]
+
+            // Line comments: //, #, --  (# only at the start of a line, so it can't eat a fragment)
+            if ch == "/" && i + 1 < c.count && c[i + 1] == "/"
+                || ch == "-" && i + 1 < c.count && c[i + 1] == "-"
+                || ch == "#" && isLineStart(c, i) {
+                let end = indexOf("\n", in: c, from: i) ?? c.count
+                spans.append(Span(range: i..<end, style: .comment))
+                i = end
+                continue
+            }
+            // Block comments
+            if ch == "/" && i + 1 < c.count && c[i + 1] == "*" {
+                var end = i + 2
+                while end + 1 < c.count, !(c[end] == "*" && c[end + 1] == "/") { end += 1 }
+                end = min(end + 2, c.count)
+                spans.append(Span(range: i..<end, style: .comment))
+                i = end
+                continue
+            }
+            // Strings — a JSON/object key is a string followed by a colon, and reads better as a key
+            if ch == "\"" || ch == "'" || ch == "`" {
+                var end = i + 1
+                while end < c.count {
+                    if c[end] == "\\" { end += 2; continue }
+                    if c[end] == ch { end += 1; break }
+                    end += 1
+                }
+                end = min(end, c.count)
+                var next = end
+                while next < c.count, c[next] == " " { next += 1 }
+                let isKey = next < c.count && c[next] == ":"
+                spans.append(Span(range: i..<end, style: isKey ? .jsonKey : .string))
+                i = end
+                continue
+            }
+            // Numbers (not inside an identifier)
+            if ch.isNumber, !isIdentifierCharacter(i > 0 ? c[i - 1] : " ") {
+                var end = i
+                while end < c.count, c[end].isHexDigit || c[end] == "." || c[end] == "x" || c[end] == "_" { end += 1 }
+                spans.append(Span(range: i..<end, style: .number))
+                i = end
+                continue
+            }
+            // Identifiers → keywords
+            if isIdentifierCharacter(ch), !ch.isNumber {
+                var end = i
+                while end < c.count, isIdentifierCharacter(c[end]) { end += 1 }
+                if keywords.contains(String(c[i..<end])) {
+                    spans.append(Span(range: i..<end, style: .keyword))
+                }
+                i = end
+                continue
+            }
+            i += 1
+        }
+        return spans
+    }
+
+    private static func isLineStart(_ c: [Character], _ i: Int) -> Bool {
+        var j = i - 1
+        while j >= 0, c[j] == " " || c[j] == "\t" { j -= 1 }
+        return j < 0 || c[j] == "\n"
+    }
+
+    private static func isIdentifierCharacter(_ ch: Character) -> Bool {
+        ch.isLetter || ch.isNumber || ch == "_" || ch == "$"
+    }
+
+    private static func indexOf(_ needle: Character, in c: [Character], from: Int) -> Int? {
+        guard from < c.count else { return nil }
+        return c[from...].firstIndex(of: needle)
+    }
+
+    private static func indexOf(_ needle: String, in c: [Character], from: Int) -> Int? {
+        let pattern = Array(needle)
+        guard c.count >= pattern.count else { return nil }
+        var i = from
+        while i <= c.count - pattern.count {
+            if Array(c[i..<(i + pattern.count)]) == pattern { return i }
+            i += 1
+        }
+        return nil
+    }
+
+    /// The union of the keyword sets a developer's clipboard actually holds. Shared words only —
+    /// anything ambiguous (`type`, `object`, `name`) is left out on purpose.
+    static let keywords: Set<String> = [
+        // control flow / declarations, common across C-likes, Swift, Python, Go, Rust, Ruby
+        "if", "else", "elif", "for", "while", "do", "switch", "case", "default", "break",
+        "continue", "return", "yield", "await", "async", "try", "catch", "except", "finally",
+        "throw", "throws", "raise", "guard", "defer", "match", "loop",
+        "func", "function", "def", "fn", "class", "struct", "enum", "protocol", "interface",
+        "extension", "impl", "trait", "module", "namespace", "package", "import", "from",
+        "export", "require", "include", "use", "using", "let", "var", "const", "val", "static",
+        "public", "private", "protected", "internal", "final", "abstract", "override", "new",
+        "self", "this", "super", "nil", "null", "None", "true", "false", "True", "False",
+        "int", "string", "bool", "float", "double", "void", "any", "unknown", "never",
+        // SQL — clipboards are full of it
+        "SELECT", "FROM", "WHERE", "JOIN", "LEFT", "INNER", "OUTER", "GROUP", "ORDER", "BY",
+        "LIMIT", "OFFSET", "INSERT", "UPDATE", "DELETE", "VALUES", "SET", "AND", "OR", "NOT",
+        "AS", "ON", "WITH", "UNION", "HAVING", "DISTINCT"
+    ]
+}

@@ -26,6 +26,7 @@ live in all day; it should be fast, private, and free. So I made the one I wante
 
 - **Type-aware** — it knows a link from code from a color from a git SHA, and shows the right glyph (with a live swatch for colors).
 - **⌘K transforms** — reshape a clip in place with a live preview: case, slugify, Base64/URL, JSON pretty-print, **JSON → TypeScript**, **decode a JWT**, **Unix ↔ ISO** time, and more.
+- **Hover to read the whole clip** — a preview card shows the full text (long clips keep their start *and* end, never just the start), formatted for what it is: JSON re-wrapped, diffs coloured, a URL's host and tracking params picked out.
 - **Built for developers** — scoped search (`type:`, `app:`, `/regex/`), a paste-stack, and **⌘O** to open a commit / issue / `file:line` straight in your tools.
 - **Private by default** — local-only, no telemetry, no subscription; history is **encrypted at rest** and detected secrets are masked on screen.
 
@@ -51,6 +52,20 @@ Free and open source (MIT) — and it stays that way. If you've used **Maccy** o
 <p align="center">
   <img src="docs/media/paste-stack.png" alt="Paste-stack with numbered queued clips" width="620">
 </p>
+
+**Hover preview** — pause on a row (in the menu or the palette) and the whole clip appears
+beside it, read the way it was written:
+
+- long clips elide the **middle**, never the ends — the tail is usually what tells two
+  near-identical clips apart;
+- **JSON** is re-wrapped for reading (whitespace only — key order and values are untouched),
+  **diffs** show their `+`/`−` lines in colour with a `+12 −3` badge, **code** gets comments,
+  strings and keywords, and a **URL** shows its host with any tracking parameters called out;
+- the footer carries the shape and provenance: characters / words / lines, the app it came
+  from, when you copied it, and the **⌘O** action for it;
+- masked secrets stay masked here too, and images preview at a size you can actually judge.
+
+Turn it off in **Settings → General** if you'd rather not have it.
 
 ### Everything else
 

@@ -116,10 +116,18 @@ struct ClipTransform: Identifiable, Sendable {
         return String(data: pretty, encoding: .utf8)
     }
 
-    private static let trackingParams: Set<String> = [
-        "gclid", "fbclid", "gbraid", "wbraid", "msclkid", "yclid", "dclid",
-        "mc_eid", "mc_cid", "igshid", "ref", "ref_src", "ref_url", "_hsenc", "_hsmi", "vero_id"
+    /// Common tracking parameters. Shared with the preview card (`ClipSyntax`) so the junk it
+    /// highlights and the junk this strips are always the same set.
+    static let trackingParameters: Set<String> = [
+        "gclid", "fbclid", "gbraid", "wbraid", "msclkid", "yclid", "dclid", "twclid",
+        "mc_eid", "mc_cid", "igshid", "ref", "ref_src", "ref_url", "_hsenc", "_hsmi",
+        "vero_id", "wickedid", "s_kwcid"
     ]
+
+    static func isTrackingParameter(_ name: String) -> Bool {
+        let lower = name.lowercased()
+        return lower.hasPrefix("utm_") || trackingParameters.contains(lower)
+    }
 
     /// Parse only a real http/https URL (exact scheme, non-empty host) so the URL
     /// transforms don't fire on `httpx://…` or a bare `foo?bar=baz`.
@@ -134,10 +142,7 @@ struct ClipTransform: Identifiable, Sendable {
     /// Returns nil for non-URLs or when nothing would be stripped, so it stays hidden.
     private static func stripTrackingParams(_ s: String) -> String? {
         guard var comps = httpURLComponents(s), let items = comps.queryItems else { return nil }
-        let kept = items.filter { item in
-            let name = item.name.lowercased()
-            return !name.hasPrefix("utm_") && !trackingParams.contains(name)
-        }
+        let kept = items.filter { !isTrackingParameter($0.name) }
         guard kept.count != items.count else { return nil }   // nothing stripped → don't offer
         comps.queryItems = kept.isEmpty ? nil : kept
         return comps.string

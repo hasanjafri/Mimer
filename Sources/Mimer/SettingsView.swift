@@ -49,6 +49,14 @@ private struct GeneralSettingsView: View {
             }
 
             Section {
+                Toggle("Preview a clip when you hover it", isOn: $prefs.previewOnHover)
+            } header: {
+                Text("Preview")
+            } footer: {
+                Text("Shows the full clip beside the list — long clips keep their start and end, with the middle elided.")
+            }
+
+            Section {
                 Toggle("Launch Mimer at login", isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) {
                         LaunchAtLogin.setEnabled(launchAtLogin)
